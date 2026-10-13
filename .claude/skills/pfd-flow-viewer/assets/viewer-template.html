@@ -1,0 +1,297 @@
+<title>__DOC_TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: drafting-sheet diagram on the left, stream data sheet docked on the right (stacks below on narrow screens).
+   Category line colors are generated at runtime from DATA.categories. */
+:root{
+  --bg:#f3f5f2; --paper:#fbfcfa; --ink:#1b2326; --muted:#5b666a; --rule:#d3d9d4; --grid:#e6eae5; --panel:#ffffff; --chip:#eef1ed;
+  --ok:#0d8478; --warn:#b4570a; --focus:#1d5fae;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101518; --paper:#141b1e; --ink:#e2e8e6; --muted:#97a2a5; --rule:#2b3539; --grid:#1b2327; --panel:#172024; --chip:#1f292d;
+  --ok:#45c9b9; --warn:#ffa152; --focus:#6ea9ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101518; --paper:#141b1e; --ink:#e2e8e6; --muted:#97a2a5; --rule:#2b3539; --grid:#1b2327; --panel:#172024; --chip:#1f292d;
+  --ok:#45c9b9; --warn:#ffa152; --focus:#6ea9ff; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.wrap{max-width:1680px;margin:0 auto;padding-block:20px 40px;padding-inline:16px;display:flex;flex-direction:column;gap:16px}
+header.top{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:22px;line-height:1.25;margin:2px 0 0;font-weight:700;text-wrap:balance}
+.lede{color:var(--muted);margin:4px 0 0;max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid currentColor}
+.legend i.dash{border-top-style:dashed}
+.balance{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.balance:empty{display:none}
+.bal{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.bal .k{font-size:12px;color:var(--muted)}
+.bal .v{font-family:var(--f-mono);font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bal .ok{color:var(--ok);font-family:var(--f-mono);font-size:12px}
+.bal .warn{color:var(--warn);font-family:var(--f-mono);font-size:12px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+@media (max-width:1100px){.main{grid-template-columns:minmax(0,1fr)}}
+.sheet{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow-x:auto;min-width:0}
+.sheet svg{display:block;width:100%;height:auto}
+@media (max-width:1100px){.sheet svg{min-width:var(--svg-min,1100px)}}
+.hint{font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--rule)}
+.hint:empty{display:none}
+/* diagram */
+.node rect{fill:var(--panel);stroke:var(--ink);stroke-width:1.2}
+.node.src rect{fill:var(--chip);stroke-dasharray:4 3}
+.node .t{font:600 14.5px var(--f-body);fill:var(--ink)}
+.node .s{font:12px var(--f-mono);fill:var(--muted)}
+.node .p{font:600 13px var(--f-body);fill:var(--ink)}
+.node{cursor:pointer}
+.node:hover rect,.node:focus rect{stroke:var(--focus);stroke-width:2}
+.node:focus{outline:none}
+.frame{fill:none;stroke:var(--rule);stroke-width:1.2;stroke-dasharray:6 4}
+.ftitle{font:600 12px var(--f-mono);fill:var(--muted);letter-spacing:.06em}
+.ln{fill:none;stroke-width:2.8;stroke-linejoin:round;transition:opacity .15s,stroke-width .15s}
+.halo{fill:none;stroke:var(--paper);stroke-width:8}
+.hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer;pointer-events:stroke}
+.hit:focus{outline:none}
+.dashed{stroke-dasharray:5 4}
+.badge polygon{fill:var(--paper);stroke:currentColor;stroke-width:1.4}
+.badge text{font:600 12.5px var(--f-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.badge{cursor:pointer}
+.bar{stroke-width:7;stroke-linecap:square;cursor:pointer}
+.barlab{font:600 13px var(--f-mono);letter-spacing:.05em}
+.conn{font:12.5px var(--f-body);fill:var(--muted)}
+.dot{fill:var(--ink)}
+svg.has-sel .g-line{opacity:.45}
+svg.has-sel .g-line.sel{opacity:1}
+svg.has-sel .g-line.sel .ln{stroke-width:4.6}
+svg.has-sel .g-line.sel .badge polygon{stroke-width:2.6;fill:var(--chip)}
+.g-line:hover .ln{stroke-width:3.6}
+.g-line:focus-within .ln{stroke-width:4}
+/* panel */
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media (max-width:1100px){.panel{position:static}}
+.p-head{display:flex;flex-direction:column;gap:6px}
+.p-num{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.p-num b{font:600 26px var(--f-mono);font-variant-numeric:tabular-nums}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.p-name{font-size:12.5px;color:var(--muted);font-family:var(--f-mono)}
+.p-ko{font-weight:600;font-size:15px;text-wrap:balance}
+.p-ko.big{font-size:17px}
+.route{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px;margin:0}
+.route dt{color:var(--muted)}
+.route dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kpi{background:var(--chip);border-radius:5px;padding:8px 10px;min-width:0}
+.kpi .k{font-size:11.5px;color:var(--muted)}
+.kpi .v{font:600 17px var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .v small{font:400 11.5px var(--f-mono);color:var(--muted);margin-left:3px}
+.linkbtn{all:unset;cursor:pointer;font-family:var(--f-mono);text-decoration:underline}
+.linkbtn:focus-visible{outline:2px solid var(--focus)}
+h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.tblwrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{padding:4px 6px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:top}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl thead th{color:var(--muted);font-weight:500;font-size:11.5px}
+.tbl td.num{font-family:var(--f-mono)}
+.tbl td.u{color:var(--muted);font-size:11.5px;text-align:left}
+.note{font-size:12.5px;background:var(--chip);border-radius:5px;padding:8px 10px;color:var(--ink)}
+.note p{margin:0}
+.note p+p{margin-top:6px}
+.src{font-size:11.5px;color:var(--muted);font-family:var(--f-mono);overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 12px var(--f-mono);padding:3px 8px;border-radius:4px;border:1.5px solid currentColor;background:var(--panel);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--chip);font-weight:600}
+.chips button:focus-visible,.hit:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.chipgroup{display:flex;flex-direction:column;gap:6px}
+.chipgroup .lab{font-size:11.5px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.ln{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="title"></h1>
+      <p class="lede" id="lede"></p>
+    </div>
+    <div class="legend" id="legend" aria-label="범례"></div>
+  </header>
+  <section class="balance" id="balance" aria-label="물질수지 검증"></section>
+  <div class="main">
+    <div class="sheet">
+      <svg id="dia" role="img">
+        <defs id="defs">
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern>
+        </defs>
+        <rect id="gridbg" x="0" y="0" fill="url(#grid)"/>
+        <g id="frames"></g>
+        <g id="lines"></g>
+        <g id="nodes"></g>
+      </svg>
+      <div class="hint" id="hint"></div>
+    </div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script id="pfd-data" type="application/json">__PFD_DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('pfd-data').textContent);
+const M=D.meta||{};
+const CATS=D.categories||{};
+const S=D.streams||{};
+const NI=D.nodeInfo||{};
+const FLOW_ROWS=[['Balance · 일 합계','dm','dv','t/d','m³/d'],['Nominal · 평균','nm','nv'],['Nominal · 최대','nxm','nxv'],['Nominal · 최소','nnm','nnv'],['Design · 평균','dsm','dsv'],['Design · 최대','dxm','dxv'],['Design · 최소','dnm','dnv']];
+const PROP_ROWS=[['Density','t/m³','rho'],['Temperature','°C','T'],['Pressure (abs)','bar','P'],['% Solids','%','sol'],['% Liquid','%','liq'],['Li⁺','ppm','li'],['pH','—','pH'],['Design Factor','—','DF'],['Run Time','h/d','RT']];
+const KPI_DEFAULT=[['Nominal 질량유량','nm','t/h'],['Design 질량유량','dsm','t/h'],['온도','T','°C'],['압력','P','bar(a)']];
+
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dash=v=>v===undefined||v===null||v===''||v==='-'||v==='–';
+const num=v=>dash(v)?NaN:parseFloat(String(v).replace(/,/g,''));
+const fmt=n=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:2}):'–';
+const lab=id=>S[id]?(S[id].label||(S[id].info?'—':id)):id;
+
+/* ---------- header, legend, category styles ---------- */
+document.getElementById('eyebrow').textContent=M.eyebrow||'';
+document.getElementById('title').textContent=M.title||'';
+document.getElementById('lede').textContent=M.lede||'';
+document.getElementById('hint').textContent=M.hint||'';
+(function(){
+  let lt='',dk='',rules='';
+  for(const k in CATS){const c=CATS[k];lt+=`--c-${k}:${c.light};`;dk+=`--c-${k}:${c.dark||c.light};`;
+    rules+=`.c-${k}{stroke:var(--c-${k});color:var(--c-${k})}`;if(c.dashed)rules+=`.ln.c-${k}{stroke-dasharray:7 4}`;}
+  const st=document.createElement('style');
+  st.textContent=`:root{${lt}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dk}}}:root[data-theme="dark"]{${dk}}${rules}`;
+  document.head.appendChild(st);
+  document.getElementById('legend').innerHTML=Object.keys(CATS).map(k=>`<span class="c-${k}"><i class="${CATS[k].dashed?'dash':''}"></i>${esc(CATS[k].label)}</span>`).join('');
+})();
+
+/* ---------- balance cards ---------- */
+(function(){
+  const box=document.getElementById('balance');
+  if(Array.isArray(D.checks)&&D.checks.length){
+    box.innerHTML=D.checks.map(c=>{
+      const f=c.field||'dm',u=c.unit||'t/d',tol=c.tol==null?1:c.tol;
+      const lv=c.lhs.map(id=>num(S[id]&&S[id].v&&S[id].v[f])),rv=c.rhs.map(id=>num(S[id]&&S[id].v&&S[id].v[f]));
+      const missing=lv.concat(rv).some(x=>!Number.isFinite(x));
+      const ls=lv.reduce((a,b)=>a+b,0),rs=rv.reduce((a,b)=>a+b,0),diff=Math.abs(ls-rs);
+      const okc=!missing&&diff<=tol;
+      const v=`${lv.map(fmt).join(' + ')} = ${fmt(ls)} ${u}`;
+      const r=missing?'⚠ 값이 없는 Stream이 있어 계산 불가':`${okc?'✓':'⚠'} ${esc(c.rhsLabel||c.rhs.map(lab).join('·'))} = ${fmt(rs)} ${u}${diff>0?` · 차이 ${fmt(diff)}`:''}`;
+      return `<div class="bal"><span class="k">${esc(c.name)}</span><span class="v">${esc(v)}</span><span class="${okc?'ok':'warn'}">${r}</span></div>`;
+    }).join('');
+  } else if(Array.isArray(D.balance)){
+    box.innerHTML=D.balance.map(b=>`<div class="bal"><span class="k">${esc(b.k)}</span><span class="v">${esc(b.v)}</span><span class="${b.warn?'warn':'ok'}">${esc(b.ok||'')}</span></div>`).join('');
+  }
+})();
+
+/* ---------- diagram ---------- */
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('dia');
+const [VW,VH]=M.viewBox||[1600,900];
+svg.setAttribute('viewBox',`0 0 ${VW} ${VH}`);
+svg.setAttribute('aria-label',M.diagramLabel||M.title||'공정 흐름도');
+if(M.minWidth)document.documentElement.style.setProperty('--svg-min',M.minWidth+'px');
+const gb=document.getElementById('gridbg');gb.setAttribute('width',VW);gb.setAttribute('height',VH);
+const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+const defs=document.getElementById('defs'),gF=document.getElementById('frames'),gL=document.getElementById('lines'),gN=document.getElementById('nodes');
+Object.keys(CATS).forEach(k=>{const m=el('marker',{id:`arr-${k}`,viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto'},defs);el('path',{d:'M0 0L10 5L0 10z',fill:`var(--c-${k})`},m)});
+const onKey=fn=>e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn()}};
+
+(D.frames||[]).forEach(f=>{el('rect',{x:f.x,y:f.y,width:f.w,height:f.h,rx:4,class:'frame'},gF);if(f.title){const t=el('text',{x:f.tx!=null?f.tx:f.x+12,y:f.ty!=null?f.ty:f.y+f.h-11,class:'ftitle'},gF);t.textContent=f.title}});
+
+const lineGroups={};
+function hexPts(x,y,w){const h=11,s=7;return [[x-w/2,y],[x-w/2+s,y-h],[x+w/2-s,y-h],[x+w/2,y],[x+w/2-s,y+h],[x-w/2+s,y+h]].map(p=>p.join(',')).join(' ')}
+(D.lines||[]).forEach(L=>{
+  const sid=L.s||null;const cat=L.cat||(sid&&S[sid]&&S[sid].cat)||Object.keys(CATS)[0];
+  const d='M'+L.pts.map(p=>p.join(' ')).join(' L');
+  const g=el('g',{class:'g-line','data-s':sid||''},gL);
+  el('path',{d,class:'halo'},g);
+  el('path',{d,class:`ln c-${cat}${L.dashed?' dashed':''}`,'marker-end':L.arrow===false?'':`url(#arr-${cat})`},g);
+  if(sid&&S[sid]){
+    const hit=el('path',{d,class:'hit',tabindex:0,role:'button','aria-label':`Stream ${lab(sid)} ${S[sid].ko||''}`},g);
+    hit.addEventListener('click',()=>select(sid));hit.addEventListener('keydown',onKey(()=>select(sid)));
+    (lineGroups[sid]=lineGroups[sid]||[]).push(g);
+    if(L.lab){const txt=lab(sid);const w=20+txt.length*8;const b=el('g',{class:`badge c-${cat}`},g);
+      el('polygon',{points:hexPts(L.lab[0],L.lab[1],w)},b);el('text',{x:L.lab[0],y:L.lab[1]+.5},b).textContent=txt;
+      b.addEventListener('click',()=>select(sid));}
+  }
+});
+(D.dots||[]).forEach(([x,y])=>el('circle',{cx:x,cy:y,r:3.2,class:'dot'},gL));
+(D.bars||[]).forEach(B=>{
+  const g=el('g',{tabindex:0,role:'button','aria-label':B.label||B.node},gL);
+  el('line',{x1:B.x1,y1:B.y1,x2:B.x2,y2:B.y2,class:`bar c-${B.cat}`},g);
+  if(B.label){const a={x:B.lx,y:B.ly,class:`barlab c-${B.cat}`,'text-anchor':'middle',fill:'currentColor'};if(B.rotate)a.transform=`rotate(${B.rotate} ${B.lx} ${B.ly})`;el('text',a,g).textContent=B.label}
+  if(B.node&&NI[B.node]){g.addEventListener('click',()=>selectNode(B.node));g.addEventListener('keydown',onKey(()=>selectNode(B.node)))}
+});
+(D.texts||[]).forEach(T=>{const a={x:T.x,y:T.y,class:T.cls||'conn'};if(T.anchor)a['text-anchor']=T.anchor;if(T.rotate)a.transform=`rotate(${T.rotate} ${T.x} ${T.y})`;el('text',a,gL).textContent=T.t});
+(D.nodes||[]).forEach(n=>{
+  const g=el('g',{class:'node'+(n.src?' src':''),tabindex:0,role:'button','aria-label':n.title},gN);
+  el('rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:3},g);
+  const rows=[[n.title,'t'],[n.sub,'s'],[n.sub2,n.sub2Strong?'p':'s']].filter(r=>r[0]);
+  const y0=n.y+n.h/2-(rows.length-1)*8.5;
+  rows.forEach(([txt,cls],i)=>{el('text',{x:n.x+10,y:y0+i*17+4,class:cls},g).textContent=txt});
+  if(NI[n.id]){g.addEventListener('click',()=>selectNode(n.id));g.addEventListener('keydown',onKey(()=>selectNode(n.id)))}
+});
+
+/* ---------- panel ---------- */
+const panel=document.getElementById('panel');
+function chipsHTML(current){
+  const groups={};Object.keys(S).forEach(k=>{if(S[k].info)return;(groups[S[k].cat]=groups[S[k].cat]||[]).push(k)});
+  return '<div class="chipgroup"><h3>전체 Stream</h3>'+Object.keys(CATS).filter(c=>groups[c]).map(c=>`<div class="lab">${esc(CATS[c].label)}</div><div class="chips">${groups[c].map(k=>`<button type="button" class="c-${c}" data-s="${esc(k)}" aria-pressed="${k===current}">${esc(lab(k))}</button>`).join('')}</div>`).join('')+'</div>';
+}
+const notesHTML=n=>n&&n.length?`<div class="note">${n.map(t=>`<p>${esc(t)}</p>`).join('')}</div>`:'';
+const compHTML=(title,c)=>c&&c.length&&c.some(r=>!dash(r[1]))?`<div><h3>${title}</h3><table class="tbl"><tbody>${c.map(r=>`<tr><td>${esc(r[0])}</td><td class="u">${esc(r[2]||'%')}</td><td class="num">${dash(r[1])?'–':esc(r[1])}</td></tr>`).join('')}</tbody></table></div>`:'';
+
+function renderStream(id){
+  const s=S[id];const c=s.cat;const v=s.v||{};
+  let h=`<div class="p-head"><div class="p-num c-${c}"><b>${esc(lab(id))}</b><span class="pill">${esc(CATS[c]?CATS[c].label:c)}</span></div><div class="p-ko">${esc(s.ko||'')}</div>${s.en?`<div class="p-name">${esc(s.en)}</div>`:''}</div>`;
+  if(s.from||s.to)h+=`<dl class="route"><dt>From</dt><dd>${esc(s.from||'–')}</dd><dt>To</dt><dd>${esc(s.to||'–')}</dd></dl>`;
+  const kpi=s.kpi||(s.v?KPI_DEFAULT.map(([k,f,u])=>[k,v[f],u]):null);
+  if(kpi)h+=`<div class="kpis">${kpi.map(([k,val,u])=>`<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${dash(val)?'–':esc(val)}${dash(val)||!u?'':`<small>${esc(u)}</small>`}</div></div>`).join('')}</div>`;
+  if(s.v){
+    const fr=FLOW_ROWS.filter(r=>!(dash(v[r[1]])&&dash(v[r[2]])));
+    if(fr.length)h+=`<div><h3>유량</h3><table class="tbl"><thead><tr><th></th><th>질량</th><th>체적</th></tr></thead><tbody>${fr.map(r=>`<tr><td>${r[0]}</td><td class="num">${dash(v[r[1]])?'–':esc(v[r[1]])+' '+(r[3]||'t/h')}</td><td class="num">${dash(v[r[2]])?'–':esc(v[r[2]])+' '+(r[4]||'m³/h')}</td></tr>`).join('')}</tbody></table></div>`;
+    const pr=PROP_ROWS.filter(r=>r[2]!=='li'||!dash(v.li)).map(r=>[r[0],r[1],v[r[2]]]).concat(s.extraProps||[]);
+    h+=`<div><h3>물성 · 운전값</h3><table class="tbl"><tbody>${pr.map(r=>`<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${dash(r[2])?'–':esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if(s.rows)h+=`<div><h3>Stream Table</h3><table class="tbl"><tbody>${s.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+  const ch=compHTML('성분 · Liquid (wt%)',s.comp)+compHTML('성분 · Solids (wt%)',s.compSolids);
+  h+=ch||(s.v||s.rows?`<div class="note"><p>${esc(s.compNote||'도면에 이 라인의 성분 값이 없습니다(전부 –).')}</p></div>`:'');
+  h+=notesHTML(s.note);
+  if(s.sheet)h+=`<div class="src">출처: ${esc(s.sheet)}</div>`;
+  h+=chipsHTML(id);
+  panel.innerHTML=h;wire();
+}
+function renderNode(id){
+  const n=NI[id];
+  let h=`<div class="p-head"><div class="p-ko big">${esc(n.title)}</div>${n.tags?`<div class="p-name">${esc(n.tags)}</div>`:''}</div>`;
+  if(n.kpiStreams&&n.kpiStreams.length)h+=`<div class="kpis">${n.kpiStreams.filter(k=>S[k]).map(k=>{const s=S[k];return `<div class="kpi c-${s.cat}"><div class="k">${esc(s.short||CATS[s.cat].label)} <button type="button" class="linkbtn" data-s="${esc(k)}">${esc(lab(k))}</button></div><div class="v">${dash(s.v&&s.v.nm)?'–':esc(s.v.nm)}<small>t/h</small></div></div>`}).join('')}</div>`;
+  if(n.compare){const C=n.compare;
+    h+=`<div><h3>${esc(C.title||'비교')}</h3><div class="tblwrap"><table class="tbl"><thead><tr><th></th><th></th>${C.head.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${C.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td>${r.slice(2).map(x=>`<td class="num">${dash(x)?'–':esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${C.foot&&C.foot.length?`<div class="src" style="margin-top:6px">${C.foot.map(esc).join('<br>')}</div>`:''}</div>`;}
+  h+=notesHTML(n.info);
+  if(n.links&&n.links.length)h+=`<div><h3>연결 Stream</h3><div class="chips">${n.links.filter(k=>S[k]).map(k=>`<button type="button" class="c-${S[k].cat}" data-s="${esc(k)}">${esc(S[k].info?(S[k].ko||k):lab(k))}</button>`).join('')}</div></div>`;
+  h+=chipsHTML(null);
+  panel.innerHTML=h;wire();
+}
+function wire(){panel.querySelectorAll('[data-s]').forEach(b=>b.addEventListener('click',()=>select(b.dataset.s)))}
+function clearSel(){svg.querySelectorAll('.g-line.sel').forEach(g=>g.classList.remove('sel'))}
+const KEY='pfd-sel:'+(M.docTitle||M.title||'');
+function select(id){
+  if(!S[id])return;clearSel();svg.classList.add('has-sel');
+  (lineGroups[id]||lineGroups[S[id].drawnAs]||[]).forEach(g=>g.classList.add('sel'));
+  renderStream(id);try{localStorage.setItem(KEY,id)}catch(e){}
+}
+function selectNode(id){
+  clearSel();const n=NI[id];const ids=[...(n.links||[]),...(n.kpiStreams||[])];
+  if(ids.length){svg.classList.add('has-sel');ids.forEach(k=>(lineGroups[k]||[]).forEach(g=>g.classList.add('sel')))}else svg.classList.remove('has-sel');
+  renderNode(id);
+}
+let start=M.defaultSelect||Object.keys(S).find(k=>!S[k].info);
+try{const v=localStorage.getItem(KEY);if(v&&S[v])start=v}catch(e){}
+if(start&&S[start])select(start);else panel.innerHTML=chipsHTML(null),wire();
+</script>
