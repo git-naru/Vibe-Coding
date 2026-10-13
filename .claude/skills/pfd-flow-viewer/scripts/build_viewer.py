@@ -45,15 +45,44 @@ def overlap(a, b, pad=1):
     return not (a[2] + pad <= b[0] or b[2] + pad <= a[0] or a[3] + pad <= b[1] or b[3] + pad <= a[1])
 
 
+def apply_links(data, links):
+    """Merge sheet information from `pfd_extract.py links --json` into the viewer data (never overwrites)."""
+    meta = data.setdefault("meta", {})
+    meta.setdefault("sheets", [dict(dwg=s["dwg"], title=s["title"], file=s["file"], page=s["page"])
+                               for s in links.get("sheets", [])])
+    flows = links.get("flows", [])
+    meta.setdefault("sheetLinks", dict(
+        matched=sum(1 for f in flows if f["check"] == "matched"),
+        issues=sum(1 for f in flows if f["target"] and not f["check"].startswith("matched") or "typo" in f["check"]),
+        missing=len(links.get("missing", {}))))
+    for sid, s in data.get("streams", {}).items():
+        if s.get("sheets") or s.get("info"):
+            continue
+        key = s.get("label") or sid
+        hits = [f for f in flows if f.get("stream") == key]
+        if hits:
+            seen = []
+            for f in hits:
+                for dwg, at in ((f["sheet"], f["at"]), (f["dwg"], f["target"] or "입력에 없음")):
+                    item = f"{dwg} ({at})"
+                    if item not in seen:
+                        seen.append(item)
+            s["sheets"] = seen
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("data")
     ap.add_argument("out")
     ap.add_argument("--template", default=str(DEFAULT_TEMPLATE))
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    ap.add_argument("--links", help="links JSON from `pfd_extract.py links --json`: fills meta.sheets, "
+                    "meta.sheetLinks and each stream's `sheets` (where it crosses between sheets)")
     a = ap.parse_args()
 
     data = json.loads(Path(a.data).read_text(encoding="utf-8"))
+    if a.links:
+        apply_links(data, json.loads(Path(a.links).read_text(encoding="utf-8")))
     errors, warns = [], []
 
     meta = data.get("meta", {})

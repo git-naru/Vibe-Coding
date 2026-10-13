@@ -12,7 +12,7 @@
 |---|---|
 | `SKILL.md` | 작업 절차 (범위 → 읽기 → 정리 → 수지 검증 → 배치 → 빌드·게시 → 보고) |
 | `assets/viewer-template.html` | 고정된 화면 템플릿 (라이트/다크, 모바일 대응) |
-| `scripts/pfd_extract.py` | PDF 페이지 정보·Stream 번호 검색·고해상도 렌더·표 크롭, XLSX/DOCX 덤프 |
+| `scripts/pfd_extract.py` | PDF(여러 파일·여러 장) 시트 식별, 시트 간 연결 지도, Stream 번호 검색, 고해상도 렌더·표 크롭, XLSX/DOCX 덤프 |
 | `scripts/build_viewer.py` | 데이터 검증(참조, 좌표 겹침, 물질수지) 후 HTML 빌드 |
 | `references/data-schema.md` | 데이터 JSON 형식과 Stream Table 항목 매핑 |
 | `examples/demo-steam.json` | 가상 데이터 예제: 보일러 1기, 사용처 3곳의 스팀 계통 |

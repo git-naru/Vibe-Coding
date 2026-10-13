@@ -22,15 +22,22 @@ description: PFD(Process Flow Diagram)와 Mass/Heat Balance·Stream Table 자료
 
 ## 2. 자료 읽기
 
-**PDF 도면**
-1. `pfd_extract.py info FILE.pdf`로 페이지별 도면 번호·제목·텍스트층 유무를 확인한다. `IMAGE-ONLY`로 나오는 페이지는 스캔본이라 숫자를 눈으로 읽어야 하므로 판독 오류 가능성을 보고서에 적는다.
-2. 전체 구조는 Read 도구로 PDF를 페이지 단위로 훑어 파악한다. 이 저해상도 화면에서 **숫자를 옮겨 적지 않는다.**
-3. 대상 계통이 나오는 페이지를 찾는다: `pfd_extract.py find FILE.pdf 105 106 107 …` (Stream 번호, Tag). 같은 Stream이 여러 시트에 있으면 전부 확인해 값이 다른지 비교한다.
-4. `render FILE.pdf 27 OUTDIR --dpi 250~300`으로 고해상도 PNG를 만든 뒤, `crop`으로 Stream Table을 잘라 Read로 읽는다.
+**PDF 도면** — 파일 하나에 여러 장, 파일마다 한 장, 또는 둘이 섞여 들어온다. 파일 순서나 이름은 믿지 않고 **도면 번호로 시트를 식별**한다. 아래 명령은 모두 파일 여러 개와 폴더를 받는다(`PDFS...`).
+1. `pfd_extract.py info PDFS...`로 페이지별 도면 번호(타이틀 블록), 제목, 텍스트층 유무를 확인한다. `IMAGE-ONLY` 페이지는 스캔본이라 숫자를 눈으로 읽어야 하고 시트 연결도 자동으로 잡히지 않으므로, 판독 오류 가능성을 보고서에 적는다.
+2. `pfd_extract.py links PDFS... --json LINKS.json`으로 **시트 지도**를 만든다. 각 시트의 Off-page 연결(다른 도면 번호 + FROM/TO + Stream 번호)을 모아 다음을 알려준다.
+   - 연결 대상 도면이 입력에 있으면 그 파일·페이지, 없으면 `NOT PROVIDED`(입력에 없는 도면 목록도 따로 나온다)
+   - 상대 시트에도 같은 Stream의 반대 방향 연결이 있으면 `matched`, 없으면 `no return connector`
+   - 원 도면의 번호 오기(예: `000789` ↔ `00789`)는 `dwg no. typo in source`로 표시하고 같은 시트로 연결한다
+   - 같은 도면 번호가 두 시트에 나오면 `WARN`
+   여러 시트에 걸친 계통은 이 표로 연결을 따라가며 범위를 정한다. 대상 계통이 입력에 없는 도면으로 이어지면, 그 끝은 배터리 리밋(`src` 박스)으로 두고 "입력에 없음"을 note에 적는다. 사용자에게 그 도면을 더 달라고 할지 보고서에서 묻는다.
+   `no return connector`와 번호 오기는 자동 판정이므로, 해당 연결은 도면을 확대해 직접 확인하고 원 도면의 문제가 맞으면 note에 적는다.
+3. 전체 구조는 Read 도구로 PDF를 페이지 단위로 훑어 파악한다. 이 저해상도 화면에서 **숫자를 옮겨 적지 않는다.**
+4. 대상 계통이 나오는 페이지를 찾는다: `pfd_extract.py find PDFS... -t 105 106 107 …` (Stream 번호, Tag). 결과는 `파일 p페이지`로 나온다. 같은 Stream이 여러 시트에 있으면 전부 확인해 값이 다른지 비교한다.
+5. `render FILE.pdf 27 OUTDIR --dpi 250~300`으로 고해상도 PNG를 만든 뒤, `crop`으로 Stream Table을 잘라 Read로 읽는다. (회전된 시트도 화면에 보이는 방향으로 렌더링된다.)
    - 좌표는 Read 미리보기(가로 약 2000px) 기준으로 준다: `--box X0 Y0 X1 Y1`.
    - 열이 많은 표는 `--cols 50:215,1300:1450`처럼 항목명 열과 필요한 Stream 열만 이어 붙여 읽는다. 한 장에 Stream 10~12열 이하가 되게 나눈다.
    - 도면 본체도 같은 방식으로 2~4조각으로 잘라 확대해, 라인이 어디서 어디로 가는지, 합류·분기, 운전/예비(SB) 장비를 확인한다.
-5. Note 문단(도면 하단)은 `text FILE.pdf PAGE`로 텍스트를 뽑아 읽는다. 운전시간, 배치/간헐 운전, 설계 여유, 재순환 비율 같은 해석 근거가 여기 있다.
+6. Note 문단(도면 하단)은 `text FILE.pdf PAGE`로 텍스트를 뽑아 읽는다. 운전시간, 배치/간헐 운전, 설계 여유, 재순환 비율 같은 해석 근거가 여기 있다.
 
 **XLSX (Stream Table / Mass Balance)**: `pfd_extract.py xlsx FILE.xlsx`로 시트별 셀 좌표와 값을 뽑는다. 수치는 엑셀 값을 우선한다(도면 판독보다 정확). `[no cached value: =…]`가 보이면 수식 결과가 저장되지 않은 파일이므로 사용자에게 엑셀에서 저장한 파일을 요청하거나 수식을 직접 계산해 출처를 표시한다. 엑셀에는 보통 연결 관계가 없으므로 From/To는 PFD 도면이나 사용자 설명으로 채운다.
 
@@ -66,7 +73,7 @@ description: PFD(Process Flow Diagram)와 Mass/Heat Balance·Stream Table 자료
 ## 6. 빌드 · 확인 · 게시
 
 1. JSON은 scratchpad에 작성한다. 사용자가 보관을 원하면 저장소가 비공개인지 먼저 확인하고, 공개 저장소라면 커밋하지 말고 다른 보관 위치를 묻는다.
-2. `python3 scripts/build_viewer.py data.json OUT.html` 실행 → `ERROR`는 반드시 고치고, `WARN overlap`은 좌표를 옮겨 없앤다. `balance:` 결과를 보고서에 쓴다.
+2. `python3 scripts/build_viewer.py data.json OUT.html --links LINKS.json` 실행 → `ERROR`는 반드시 고치고, `WARN overlap`·`crosses`는 좌표를 옮겨 없앤다. `balance:` 결과를 보고서에 쓴다. `--links`를 주면 화면 상단에 입력 시트 목록과 시트 간 연결 검사 요약이 나오고, 시트를 넘나드는 Stream마다 "시트" 항목(양쪽 도면 번호와 파일·페이지)이 채워진다. 이미 `sheets`가 적힌 Stream은 덮어쓰지 않는다.
 3. 화면을 한 번만 확인한다(Artifact 미리보기 또는 Playwright 스크린샷 1장). 겹침·잘림만 고치고 반복하지 않는다.
 4. Artifact 도구 규칙대로 게시한다(새 페이지면 quickstart 후 publish, `icon: "flow"`). 같은 페이지를 고칠 때는 같은 파일 경로로 다시 publish 해 URL을 유지한다.
 
@@ -75,4 +82,5 @@ description: PFD(Process Flow Diagram)와 Mass/Heat Balance·Stream Table 자료
 - 이해한 흐름을 10줄 안팎의 텍스트 다이어그램으로 요약한다.
 - 물질수지 검증 결과(맞은 것/안 맞은 것, 시간당 vs 일 합계 주의).
 - 시트 간 불일치, 모순 값, 스캔본 판독 위험, 도면에 없는 정보를 덧붙인 곳.
+- 입력 시트 수와 파일 수, 시트 연결 검사 결과(확인된 수, `no return connector`·번호 오기), 계통이 이어지지만 입력에 없는 도면.
 - Artifact 링크와 "비공개이므로 공유는 Share 메뉴에서" 안내.

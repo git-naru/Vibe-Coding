@@ -29,6 +29,10 @@ h1{font-size:22px;line-height:1.25;margin:2px 0 0;font-weight:700;text-wrap:bala
 .legend i.dash{border-top-style:dashed}
 .balance{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .balance:empty{display:none}
+.sheets{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;font-size:12.5px}
+.sheets summary{cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:12px}
+.sheets summary b{color:var(--ink);font-weight:600}
+.sheets .tblwrap{margin-top:8px}
 .bal{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .bal .k{font-size:12px;color:var(--muted)}
 .bal .v{font-family:var(--f-mono);font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
@@ -121,6 +125,7 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
     <div class="legend" id="legend" aria-label="범례"></div>
   </header>
   <section class="balance" id="balance" aria-label="물질수지 검증"></section>
+  <details class="sheets" id="sheets" hidden><summary id="sheets-sum"></summary><div class="tblwrap"><table class="tbl" id="sheets-tbl"></table></div></details>
   <div class="main">
     <div class="sheet">
       <svg id="dia" role="img">
@@ -189,6 +194,16 @@ document.getElementById('hint').textContent=M.hint||'';
   }
 })();
 
+/* ---------- input sheets (multi-file / multi-page PDFs) ---------- */
+(function(){
+  const SH=M.sheets||[];if(!SH.length)return;
+  const box=document.getElementById('sheets');box.hidden=false;
+  const files=new Set(SH.map(x=>x.file)).size;
+  const L=M.sheetLinks||null;
+  document.getElementById('sheets-sum').innerHTML=`입력 시트 <b>${SH.length}장</b> · 파일 ${files}개`+(L?` · 시트 간 연결 <b>${L.matched}</b>건 확인`+(L.issues?`, <b style="color:var(--warn)">${L.issues}건 확인 필요</b>`:'')+(L.missing?` · 입력에 없는 도면 ${L.missing}개`:''):'');
+  document.getElementById('sheets-tbl').innerHTML=`<thead><tr><th>도면 번호</th><th>제목</th><th>파일</th></tr></thead><tbody>${SH.map(x=>`<tr><td class="num" style="text-align:left">${esc(x.dwg||'–')}</td><td style="text-align:left">${esc(x.title||'')}</td><td class="num">${esc(x.file)} p${esc(x.page)}</td></tr>`).join('')}</tbody>`;
+})();
+
 /* ---------- diagram ---------- */
 const NS='http://www.w3.org/2000/svg';
 const svg=document.getElementById('dia');
@@ -250,7 +265,7 @@ const compHTML=(title,c)=>c&&c.length&&c.some(r=>!dash(r[1]))?`<div><h3>${title}
 function renderStream(id){
   const s=S[id];const c=s.cat;const v=s.v||{};
   let h=`<div class="p-head"><div class="p-num c-${c}"><b>${esc(lab(id))}</b><span class="pill">${esc(CATS[c]?CATS[c].label:c)}</span></div><div class="p-ko">${esc(s.ko||'')}</div>${s.en?`<div class="p-name">${esc(s.en)}</div>`:''}</div>`;
-  if(s.from||s.to)h+=`<dl class="route"><dt>From</dt><dd>${esc(s.from||'–')}</dd><dt>To</dt><dd>${esc(s.to||'–')}</dd></dl>`;
+  if(s.from||s.to||(s.sheets&&s.sheets.length))h+=`<dl class="route"><dt>From</dt><dd>${esc(s.from||'–')}</dd><dt>To</dt><dd>${esc(s.to||'–')}</dd>${s.sheets&&s.sheets.length?`<dt>시트</dt><dd>${s.sheets.map(esc).join('<br>')}</dd>`:''}</dl>`;
   const kpi=s.kpi||(s.v?KPI_DEFAULT.map(([k,f,u])=>[k,v[f],u]):null);
   if(kpi)h+=`<div class="kpis">${kpi.map(([k,val,u])=>`<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${dash(val)?'–':esc(val)}${dash(val)||!u?'':`<small>${esc(u)}</small>`}</div></div>`).join('')}</div>`;
   if(s.v){

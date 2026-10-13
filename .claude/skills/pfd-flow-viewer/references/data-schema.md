@@ -18,7 +18,10 @@ All text is shown as-is (escaped). Numbers are **strings copied exactly from the
     "viewBox": [1620, 880],                       // SVG coordinate space
     "minWidth": 1100,                             // px; diagram scrolls sideways below this
     "defaultSelect": "110",                       // stream opened on first load
-    "source": {"file": "…pdf", "pages": "27, 6, 9 …"} // provenance (not rendered, keep for rebuilds)
+    "source": {"file": "…pdf", "pages": "27, 6, 9 …"}, // provenance (not rendered, keep for rebuilds)
+    "sheets": [{"dwg": "DEMO-900-PFD-001", "title": "…", "file": "a.pdf", "page": 1}],  // input sheet list (collapsible strip)
+    "sheetLinks": {"matched": 44, "issues": 5, "missing": 13}  // sheet-connection check summary
+    // sheets / sheetLinks / stream.sheets are filled by `build_viewer.py --links LINKS.json`
   },
 
   "categories": {                                 // line classes = legend entries (order = legend order)
@@ -59,6 +62,7 @@ All text is shown as-is (escaped). Numbers are **strings copied exactly from the
       "kpi": [["Nominal", "606", "Nm³/h"]],               // override the 4 summary tiles
       "rows": [["Gas Flow (Nominal)", "Nm³/h", "606"]],   // free-form table for non-standard streams (gas, solids)
       "short": "가열 증기",                               // label used on node KPI tiles
+      "sheets": ["DEMO-900-PFD-001 (a.pdf p1)", "DEMO-930-PFD-001 (입력에 없음)"],  // sheets this stream crosses
       "note": ["Note 1: …", "930 시트에는 50 t/d로 적혀 있습니다."],
       "drawnAs": "101",              // highlight another stream's line when this one has none
       "info": true                   // unnumbered line: panel shows text only, hidden from chip list
