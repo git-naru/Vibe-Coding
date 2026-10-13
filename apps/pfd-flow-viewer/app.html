@@ -1,0 +1,1097 @@
+<title>PFD 흐름도 만들기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one working column — upload card, saved list, then the generated flow viewer
+   (drafting-sheet diagram + docked stream panel). Category line colours are generated at runtime. */
+:root{
+  --bg:#f3f5f2; --paper:#fbfcfa; --ink:#1b2326; --muted:#5b666a; --rule:#d3d9d4; --grid:#e6eae5; --panel:#ffffff; --chip:#eef1ed;
+  --ok:#0d8478; --warn:#b4570a; --bad:#b02a1f; --focus:#1d5fae; --accent:#1d5fae; --accent-ink:#ffffff;
+  --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101518; --paper:#141b1e; --ink:#e2e8e6; --muted:#97a2a5; --rule:#2b3539; --grid:#1b2327; --panel:#172024; --chip:#1f292d;
+  --ok:#45c9b9; --warn:#ffa152; --bad:#ff6f61; --focus:#6ea9ff; --accent:#6ea9ff; --accent-ink:#0d1418; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101518; --paper:#141b1e; --ink:#e2e8e6; --muted:#97a2a5; --rule:#2b3539; --grid:#1b2327; --panel:#172024; --chip:#1f292d;
+  --ok:#45c9b9; --warn:#ffa152; --bad:#ff6f61; --focus:#6ea9ff; --accent:#6ea9ff; --accent-ink:#0d1418; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.wrap{max-width:1680px;margin:0 auto;padding-block:20px 48px;padding-inline:16px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:22px;line-height:1.25;margin:2px 0 0;font-weight:700;text-wrap:balance}
+h2{font-size:15px;margin:0;font-weight:600}
+.lede{color:var(--muted);margin:4px 0 0;max-width:72ch}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1000px){.cols{grid-template-columns:minmax(0,1fr)}}
+button{font:inherit;font-size:13px;border-radius:5px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--focus)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.link{border:none;background:none;padding:0;color:var(--focus);text-decoration:underline}
+.drop{border:1.5px dashed var(--rule);border-radius:6px;padding:18px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;color:var(--muted);font-size:13px}
+.drop.over{border-color:var(--focus);background:var(--chip)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+label.lab{font-size:12.5px;color:var(--muted)}
+input[type=text]{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);min-width:0;flex:1 1 240px;max-width:420px}
+.chip{font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--rule);background:var(--chip);cursor:pointer;color:var(--ink)}
+.muted{color:var(--muted);font-size:12.5px}
+.tblwrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{padding:4px 6px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:top}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl thead th{color:var(--muted);font-weight:500;font-size:11.5px}
+.tbl td.num{font-family:var(--f-mono)}
+.tbl td.u{color:var(--muted);font-size:11.5px;text-align:left}
+.tbl td.l{text-align:left}
+.files td{vertical-align:middle}
+.files td.st{font-size:12px;color:var(--muted);text-align:left}
+.files td.st.ok{color:var(--ok)}.files td.st.bad{color:var(--bad)}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.sum{background:var(--chip);border-radius:5px;padding:8px 10px;min-width:0}
+.sum .k{font-size:11.5px;color:var(--muted)}
+.sum .v{font:600 16px var(--f-mono);font-variant-numeric:tabular-nums}
+.sum .v.warn{color:var(--warn)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps:empty{display:none}
+.steps li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:start;font-size:13px}
+.steps .ic{font-family:var(--f-mono);font-weight:600;color:var(--muted);text-align:center}
+.steps li.run .ic{color:var(--focus)}.steps li.done .ic{color:var(--ok)}.steps li.fail .ic{color:var(--bad)}.steps li.skip .ic{color:var(--muted)}
+.steps .who{font-size:11px;font-family:var(--f-mono);padding:1px 6px;border-radius:999px;border:1px solid var(--rule);color:var(--muted);white-space:nowrap}
+.steps .who.ai{border-color:var(--focus);color:var(--focus)}
+.steps .det{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.msg{font-size:13px;border-radius:5px;padding:8px 10px;background:var(--chip)}
+.msg.warn{border-left:3px solid var(--warn)}.msg.bad{border-left:3px solid var(--bad)}
+.msg:empty{display:none}
+.saved li{display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--rule)}
+.saved ul{list-style:none;margin:0;padding:0}
+.saved .t{font-weight:600;font-size:13px;overflow-wrap:anywhere}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.toolbar .btns{display:flex;flex-wrap:wrap;gap:8px}
+/* ---- viewer (same look as the skill's viewer template) ---- */
+#result{display:flex;flex-direction:column;gap:16px}
+.vhead{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid currentColor}
+.legend i.dash{border-top-style:dashed}
+.balance{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.balance:empty{display:none}
+.bal{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.bal .k{font-size:12px;color:var(--muted)}
+.bal .v{font-family:var(--f-mono);font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bal .ok{color:var(--ok);font-family:var(--f-mono);font-size:12px}
+.bal .warn{color:var(--warn);font-family:var(--f-mono);font-size:12px}
+.sheets{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;font-size:12.5px}
+.sheets summary{cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:12px}
+.sheets summary b{color:var(--ink);font-weight:600}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+@media (max-width:1100px){.main{grid-template-columns:minmax(0,1fr)}}
+.sheet{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow-x:auto;min-width:0}
+.sheet svg{display:block;width:100%;height:auto}
+@media (max-width:1100px){.sheet svg{min-width:var(--svg-min,1000px)}}
+.hint{font-size:12px;color:var(--muted);padding:8px 12px;border-top:1px solid var(--rule)}
+.hint:empty{display:none}
+.node rect{fill:var(--panel);stroke:var(--ink);stroke-width:1.2}
+.node.src rect{fill:var(--chip);stroke-dasharray:4 3}
+.node.unc rect{stroke:var(--warn);stroke-dasharray:6 3}
+.node .t{font:600 14.5px var(--f-body);fill:var(--ink)}
+.node .s{font:12px var(--f-mono);fill:var(--muted)}
+.node .p{font:600 13px var(--f-body);fill:var(--ink)}
+.node{cursor:pointer}
+.node:hover rect,.node:focus rect{stroke:var(--focus);stroke-width:2}
+.node:focus{outline:none}
+.frame{fill:none;stroke:var(--rule);stroke-width:1.2;stroke-dasharray:6 4}
+.ftitle{font:600 12px var(--f-mono);fill:var(--muted);letter-spacing:.06em}
+.ln{fill:none;stroke-width:2.8;stroke-linejoin:round;transition:opacity .15s,stroke-width .15s}
+.halo{fill:none;stroke:var(--paper);stroke-width:8}
+.hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer;pointer-events:stroke}
+.hit:focus{outline:none}
+.dashed{stroke-dasharray:5 4}
+.badge polygon{fill:var(--paper);stroke:currentColor;stroke-width:1.4}
+.badge text{font:600 12.5px var(--f-mono);fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.badge{cursor:pointer}
+.bar{stroke-width:7;stroke-linecap:square;cursor:pointer}
+.barlab{font:600 13px var(--f-mono);letter-spacing:.05em}
+.conn{font:12.5px var(--f-body);fill:var(--muted)}
+.dot{fill:var(--ink)}
+svg.has-sel .g-line{opacity:.45}
+svg.has-sel .g-line.sel{opacity:1}
+svg.has-sel .g-line.sel .ln{stroke-width:4.6}
+svg.has-sel .g-line.sel .badge polygon{stroke-width:2.6;fill:var(--chip)}
+.g-line:hover .ln{stroke-width:3.6}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media (max-width:1100px){.panel{position:static}}
+.p-head{display:flex;flex-direction:column;gap:6px}
+.p-num{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.p-num b{font:600 26px var(--f-mono);font-variant-numeric:tabular-nums}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.pill.flag{color:var(--warn)}
+.p-name{font-size:12.5px;color:var(--muted);font-family:var(--f-mono)}
+.p-ko{font-weight:600;font-size:15px;text-wrap:balance}
+.p-ko.big{font-size:17px}
+.route{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px;margin:0}
+.route dt{color:var(--muted)}
+.route dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kpi{background:var(--chip);border-radius:5px;padding:8px 10px;min-width:0}
+.kpi .k{font-size:11.5px;color:var(--muted)}
+.kpi .v{font:600 17px var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .v small{font:400 11.5px var(--f-mono);color:var(--muted);margin-left:3px}
+h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.note{font-size:12.5px;background:var(--chip);border-radius:5px;padding:8px 10px;color:var(--ink)}
+.note p{margin:0}.note p+p{margin-top:6px}
+.note.warn{border-left:3px solid var(--warn)}
+.src{font-size:11.5px;color:var(--muted);font-family:var(--f-mono);overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 12px var(--f-mono);padding:3px 8px;border-radius:4px;border:1.5px solid currentColor;background:var(--panel);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--chip);font-weight:600}
+.chipgroup{display:flex;flex-direction:column;gap:6px}
+.chipgroup .lab{font-size:11.5px;color:var(--muted)}
+.crop{max-width:100%;border:1px solid var(--rule);border-radius:4px;background:#fff}
+@media (prefers-reduced-motion:reduce){.ln{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PFD Flow Viewer</div>
+    <h1>PFD 흐름도 만들기</h1>
+    <p class="lede">PFD와 Mass Balance 파일을 올리고 그릴 계통을 적으면, 시트를 넘나드는 흐름까지 이어서 클릭할 수 있는 흐름도로 보여줍니다. 파일 읽기·수지 검증·그리기는 브라우저가 하고, Claude는 계통 범위와 연결 해석, 이미지로 된 표 판독에만 씁니다.</p>
+  </header>
+
+  <div class="cols" id="setup-cols">
+    <section class="card" id="setup" aria-label="새 흐름도 만들기">
+      <h2>새 흐름도</h2>
+      <div class="drop" id="drop">
+        <button type="button" class="primary" id="pick">파일 선택</button>
+        <input type="file" id="file" multiple accept=".pdf,.xlsx,.docx" hidden>
+        <span>또는 여기에 끌어다 놓기 · PDF, XLSX, DOCX · 파일당 20MB · 파일 하나에 여러 장이어도 됩니다</span>
+      </div>
+      <div class="tblwrap"><table class="tbl files" id="files"></table></div>
+      <div class="summary" id="local"></div>
+      <div class="row">
+        <label class="lab" for="system">그릴 계통</label>
+        <input type="text" id="system" placeholder="예: 스팀 생산·분배 계통" autocomplete="off">
+      </div>
+      <div class="row" id="suggest"></div>
+      <div class="row">
+        <button type="button" class="primary" id="gen" disabled>흐름도 생성</button>
+        <button type="button" id="stop" hidden>중지</button>
+        <span class="muted" id="gen-note">파일을 올리면 시트 확인까지는 바로 됩니다. 생성 단계에서 Claude를 부르며, 처음 한 번 사용 동의를 묻습니다.</span>
+      </div>
+      <ol class="steps" id="steps"></ol>
+      <div class="msg" id="msg"></div>
+    </section>
+
+    <section class="card saved" id="saved" aria-label="저장된 흐름도">
+      <h2>저장된 흐름도</h2>
+      <ul id="saved-list"><li class="muted">불러오는 중…</li></ul>
+      <div class="row">
+        <button type="button" id="open-json">JSON 파일 열기</button>
+        <input type="file" id="json-file" accept=".json,application/json" hidden>
+        <button type="button" id="demo">예시 보기</button>
+      </div>
+      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다.</p>
+    </section>
+  </div>
+
+  <section id="result" hidden aria-label="흐름도">
+    <div class="toolbar">
+      <div class="muted" id="r-status"></div>
+      <div class="btns">
+        <button type="button" id="r-new">새로 만들기</button>
+        <button type="button" id="r-save">저장</button>
+        <button type="button" id="r-dl">JSON 내려받기</button>
+      </div>
+    </div>
+    <div class="vhead">
+      <div>
+        <div class="eyebrow" id="v-eyebrow"></div>
+        <h1 id="v-title"></h1>
+        <p class="lede" id="v-lede"></p>
+      </div>
+      <div class="legend" id="v-legend" aria-label="범례"></div>
+    </div>
+    <section class="balance" id="v-balance" aria-label="물질수지 검증"></section>
+    <details class="sheets" id="v-sheets" hidden><summary id="v-sheets-sum"></summary><div class="tblwrap" style="margin-top:8px"><table class="tbl" id="v-sheets-tbl"></table></div></details>
+    <div class="main">
+      <div class="sheet">
+        <svg id="dia" role="img"><defs id="defs"><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs><rect id="gridbg" x="0" y="0" fill="url(#grid)"/><g id="g-frames"></g><g id="g-lines"></g><g id="g-nodes"></g></svg>
+        <div class="hint" id="v-hint"></div>
+      </div>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+  </section>
+</div>
+
+<script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script>
+"use strict";
+/* =====================================================================
+   0. Small helpers
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dash = v => v === undefined || v === null || v === '' || v === '-' || v === '–';
+const sleep0 = () => new Promise(r => setTimeout(r, 0));
+const fmt = n => Number.isFinite(n) ? n.toLocaleString('en-US', {maximumFractionDigits: 2}) : '–';
+const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const CDN = {
+  pdf: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+  pdfWorker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
+  xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  mammoth: 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
+  dagre: 'https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js'
+};
+const loaded = {};
+function loadScript(url) {
+  if (!loaded[url]) loaded[url] = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = url; s.onload = res;
+    s.onerror = () => rej(new Error('라이브러리를 불러오지 못했습니다: ' + url)); document.head.appendChild(s);
+  });
+  return loaded[url];
+}
+async function needPdf() {
+  await loadScript(CDN.pdf); await loadScript(CDN.pdfWorker); // worker script on the page = pdf.js runs on the main thread
+  pdfjsLib.GlobalWorkerOptions.workerSrc = CDN.pdfWorker;
+}
+/* Parse a number written either with decimal points (1,562.5) or decimal commas (1,06 / 143,61). */
+function numParse(v, decimalComma) {
+  if (dash(v)) return NaN;
+  let s = String(v).trim().replace(/\s/g, '');
+  if (!/^-?[\d.,]+$/.test(s)) return NaN;
+  if (decimalComma) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, '');
+  return parseFloat(s);
+}
+
+/* =====================================================================
+   1. Drawing numbers, sheet identity, off-page connectors (port of pfd_extract.py links)
+   ===================================================================== */
+const DWG_SRC = '[A-Z0-9][A-Z0-9.]*(?:-[A-Z0-9.&]+)*-(?:PFD|PID|P&ID|PDF)-[A-Z0-9]+';
+const DWG_G = new RegExp(DWG_SRC, 'g'), DWG_1 = new RegExp('^' + DWG_SRC + '$');
+const BADGE = /^\d{2,4}[a-z]?(?:,[a-z])*$/;
+const NOTE_WORDS = ['REFER', 'N°', 'SEE ', 'DOCUMENT', 'DETAIL', 'LATEST', 'REVISION'];
+const normDwg = s => s.trim().replace(/[.,;:)]+$/, '').replace(/_\d+$/, '');
+const canon = d => d.split('-').map(x => /^\d+$/.test(x) ? String(+x) : x).join('-');
+const isBadge = s => s.split(/\s+/).every(w => BADGE.test(w));
+
+function below(items, i, n) {
+  const a = items[i];
+  return items.filter(b => b !== a && b.y0 > a.y0 + 0.002 && b.y0 - a.y1 < 0.025 && Math.abs(b.x0 - a.x0) < 0.02)
+    .sort((p, q) => p.y0 - q.y0).slice(0, n);
+}
+function above(items, i) {
+  const a = items[i];
+  return items.filter(b => b !== a && b.y1 < a.y1 - 0.002 && a.y0 - b.y1 < 0.025 && Math.abs(b.x0 - a.x0) < 0.02)
+    .sort((p, q) => q.y1 - p.y1)[0];
+}
+function sheetIdentity(items) {
+  const corner = [];
+  items.forEach((it, i) => {
+    const t = normDwg(it.s);
+    if (it.x0 > 0.6 && it.y0 > 0.83 && DWG_1.test(t) && !below(items, i, 2).some(l => /^(FROM|TO)\b/.test(l.s))) corner.push(t);
+  });
+  const paths = [];
+  items.forEach(it => { if (/\.dwg/i.test(it.s)) (it.s.match(DWG_G) || []).forEach(d => paths.push(normDwg(d))); });
+  const own = corner.find(d => paths.includes(d)) || corner[0] || paths[0] || null;
+  return {own, aliases: [...new Set(corner.filter(d => d !== own))]};
+}
+function connectorsOf(items, own, aliases) {
+  const badges = items.filter(it => isBadge(it.s));
+  const out = [];
+  items.forEach((it, i) => {
+    for (let d of (it.s.match(DWG_G) || [])) {
+      d = normDwg(d);
+      if (d === own || aliases.includes(d) || /\.dwg/i.test(it.s)) continue;
+      const nxt = below(items, i, 2).map(x => x.s), prevIt = above(items, i), prev = prevIt ? prevIt.s : '';
+      let dir = null;
+      for (const s of nxt) { const m = s.trim().match(/^(FROM|TO)\b/); if (m) { dir = m[1]; break; } }
+      const note = NOTE_WORDS.some(k => it.s.toUpperCase().includes(k)) || (!dir && it.y0 > 0.8);
+      if (note) { out.push({kind: 'note', dwg: d}); continue; }
+      if (!dir) { if (it.x1 < 0.2) dir = 'FROM'; else if (it.x0 > 0.75) dir = 'TO'; else { out.push({kind: 'note', dwg: d}); continue; } }
+      const cy = (it.y0 + it.y1) / 2; let best = null;
+      for (const b of badges) {
+        const dy = Math.abs((b.y0 + b.y1) / 2 - cy), dx = dir === 'FROM' ? b.x0 - it.x1 : it.x0 - b.x1;
+        if (dy < 0.012 && dx > -0.02 && dx < 0.25 && (!best || dx < best[0])) best = [dx, b.s];
+      }
+      const label = prev && !DWG_1.test(normDwg(prev)) && !/^(FROM|TO)\b/.test(prev) && !isBadge(prev) ? prev : '';
+      const detail = nxt.find(s => /^(FROM|TO)\b/.test(s.trim())) || '';
+      out.push({kind: 'flow', dir, dwg: d, stream: best ? best[1] : '', label: label.slice(0, 60), detail: detail.slice(0, 90)});
+    }
+  });
+  return out;
+}
+function buildLinks(sheets) {
+  const index = {};
+  for (const sh of sheets) for (const d of [sh.dwg, ...sh.aliases]) if (d) { (index[d] = index[d] || []).push(sh); const c = canon(d); if (c !== d) (index[c] = index[c] || []).push(sh); }
+  const sheetOf = d => (index[d] || index[canon(d)] || [])[0] || null;
+  const flows = [], missing = {};
+  for (const sh of sheets) for (const c of sh.connectors) {
+    if (c.kind !== 'flow') continue;
+    const other = sheetOf(c.dwg); let check = '?';
+    if (other) {
+      const want = c.dir === 'FROM' ? 'TO' : 'FROM', mine = new Set([sh.dwg, ...sh.aliases].filter(Boolean).map(canon));
+      const ok = other.connectors.some(o => o.kind === 'flow' && o.dir === want && mine.has(canon(o.dwg)) && (!c.stream || !o.stream || o.stream === c.stream));
+      check = ok ? 'matched' : 'no return connector';
+      if (!index[c.dwg]) check += ' (dwg no. typo in source)';
+    } else (missing[c.dwg] = missing[c.dwg] || []).push(sh.key);
+    flows.push({...c, sheet: sh.dwg, sheetKey: sh.key, target: other ? other.key : null, check});
+  }
+  return {flows, missing, sheetOf, matched: flows.filter(f => f.check === 'matched').length,
+          issues: flows.filter(f => (f.target && f.check !== 'matched')).length, missingCount: Object.keys(missing).length};
+}
+
+/* =====================================================================
+   2. Stream-table rows → viewer fields (shared by text tables, XLSX and image transcription)
+   ===================================================================== */
+function mapRows(rows, ids, colValues) {
+  // rows: [{label, unit}], colValues[id] = [value per row]. Returns {id: {v, comp, compSolids, extraProps}}
+  const res = {}; ids.forEach(id => res[id] = {v: {}, comp: [], compSolids: [], extraProps: []});
+  let sec = '', sub = 'avg';
+  rows.forEach((r, ri) => {
+    const L = String(r.label || '').toLowerCase().replace(/\s+/g, ' ').trim(), U = String(r.unit || '').trim();
+    if (!L) return;
+    const hasVals = ids.some(id => !dash((colValues[id] || [])[ri]));
+    if (/balance flow/.test(L)) { sec = 'bal'; sub = 'avg'; if (!hasVals) return; }
+    else if (/maximum design flow/.test(L)) { sec = 'des'; sub = 'max'; if (!hasVals) return; }
+    else if (/nominal flow/.test(L)) { sec = 'nom'; sub = 'avg'; if (!hasVals) return; }
+    else if (/design flow/.test(L)) { sec = 'des'; sub = 'avg'; if (!hasVals) return; }
+    else if (/other values/.test(L)) { sec = 'oth'; if (!hasVals) return; }
+    else if (/chemical composition/.test(L)) { sec = /solid/.test(L) ? 'cs' : 'cl'; if (!hasVals) return; }
+    else if (/^average value/.test(L)) { sub = 'avg'; if (!hasVals) return; }
+    else if (/^maximum value/.test(L)) { sub = 'max'; if (!hasVals) return; }
+    else if (/^minimum value/.test(L)) { sub = 'min'; if (!hasVals) return; }
+    let key = null;
+    if (sec === 'bal') key = /daily mass flow/.test(L) ? 'dm' : /daily volumetric flow/.test(L) ? 'dv' : null;
+    else if (sec === 'nom' || sec === 'des') {
+      const m = /^mass flow$/.test(L), v = /^volumetric flow$/.test(L);
+      if (m || v) key = {nom: {avg: ['nm', 'nv'], max: ['nxm', 'nxv'], min: ['nnm', 'nnv']}, des: {avg: ['dsm', 'dsv'], max: ['dxm', 'dxv'], min: ['dnm', 'dnv']}}[sec][sub][m ? 0 : 1];
+    } else if (sec === 'oth') {
+      if (/^density/.test(L) && !/bulk|solid/.test(L)) key = 'rho';
+      else if (/^temperature/.test(L)) key = 'T'; else if (/^pressure/.test(L)) key = 'P';
+      else if (/% ?solids/.test(L)) key = 'sol'; else if (/moisture|% ?liquid/.test(L)) key = 'liq';
+      else if (/^li\b|^li\+|^li⁺/.test(L) && /ppm/i.test(U)) key = 'li';
+      else if (/^ph$/.test(L)) key = 'pH'; else if (/design factor/.test(L)) key = 'DF'; else if (/run time/.test(L)) key = 'RT';
+    }
+    ids.forEach(id => {
+      const val = (colValues[id] || [])[ri]; if (dash(val)) return;
+      const o = res[id];
+      if (sec === 'cl') o.comp.push([r.label, String(val), U || '%']);
+      else if (sec === 'cs') o.compSolids.push([r.label, String(val), U || '%']);
+      else if (key) o.v[key] = String(val);
+      else o.extraProps.push([r.label, U, String(val)]);
+    });
+  });
+  return res;
+}
+function looksDecimalComma(values) {
+  let dc = 0, th = 0;
+  for (const v of values) { const s = String(v || ''); if (/^\d+,\d{1,2}$/.test(s)) dc++; if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) th++; }
+  return dc > th;
+}
+
+/* Text-layer stream tables: header item "Stream", ids on the same row, row labels down the left. */
+function parseTextTable(items) {
+  const h = items.find(it => /^stream$/i.test(it.s)); if (!h) return null;
+  const head = items.filter(it => it !== h && Math.abs(it.y0 - h.y0) < 0.006 && it.x0 > h.x1 && /^\d{2,4}/.test(it.s)).sort((a, b) => a.x0 - b.x0);
+  if (head.length < 1) return null;
+  const unitIt = items.find(it => /^unit$/i.test(it.s) && it.y0 >= h.y0 - 0.01 && it.y0 < h.y0 + 0.04);
+  const firstX = head[0].x0, centers = head.map(it => (it.x0 + it.x1) / 2);
+  const bounds = centers.map((c, i) => [i ? (centers[i - 1] + c) / 2 : firstX - 0.01, i < centers.length - 1 ? (c + centers[i + 1]) / 2 : c + 0.05]);
+  const ids = head.map(it => it.s.split(/\s+/)[0]);
+  const rowItems = items.filter(it => it.y0 > h.y1 && it.x1 < firstX - 0.002 && (!unitIt || it.x0 < unitIt.x0 - 0.002)).sort((a, b) => a.y0 - b.y0);
+  const rows = [], colValues = {}; ids.forEach(id => colValues[id] = []);
+  let lastY = h.y1;
+  for (const r of rowItems) {
+    if (r.y0 - lastY > 0.05) break; lastY = r.y1;
+    const cy = (r.y0 + r.y1) / 2;
+    const unit = unitIt ? (items.find(it => Math.abs((it.y0 + it.y1) / 2 - cy) < 0.004 && Math.abs(it.x0 - unitIt.x0) < 0.02) || {}).s || '' : '';
+    rows.push({label: r.s, unit});
+    ids.forEach((id, k) => {
+      const v = items.find(it => Math.abs((it.y0 + it.y1) / 2 - cy) < 0.004 && (it.x0 + it.x1) / 2 >= bounds[k][0] && (it.x0 + it.x1) / 2 < bounds[k][1]);
+      colValues[id].push(v ? v.s : '');
+    });
+  }
+  if (rows.length < 4) return null;
+  return {ids, rows, colValues, source: 'text'};
+}
+
+/* XLSX: a sheet with a "Stream" cell; ids to its right, labels down its column, units in the "Unit" column. */
+function parseXlsxTables(wb) {
+  const out = [];
+  for (const name of wb.SheetNames) {
+    const A = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: false, defval: ''});
+    for (let r = 0; r < A.length; r++) for (let c = 0; c < (A[r] || []).length; c++) {
+      if (!/^stream$/i.test(String(A[r][c]).trim())) continue;
+      const idCols = []; for (let k = c + 1; k < A[r].length; k++) { const v = String(A[r][k]).trim(); if (/^\d{2,4}/.test(v)) idCols.push([v.split(/\s+/)[0], k]); }
+      if (!idCols.length) continue;
+      let uc = -1; for (let rr = r; rr < Math.min(A.length, r + 4); rr++) { const k = (A[rr] || []).findIndex(x => /^unit$/i.test(String(x).trim())); if (k >= 0) { uc = k; break; } }
+      const rows = [], colValues = {}; idCols.forEach(([id]) => colValues[id] = []);
+      const desc = {};
+      for (let rr = r + 1; rr < A.length; rr++) {
+        const row = A[rr] || [];
+        const label = String(row.slice(0, uc >= 0 ? uc : c + 1).filter(x => String(x).trim()).pop() || '').trim();
+        if (!label) { if (rows.length > 3 && row.every(x => !String(x).trim())) break; continue; }
+        if (/^unit$/i.test(String(row[uc] || '')) || rr === r + 1 && !rows.length && uc >= 0 && !String(row[uc]).trim()) { idCols.forEach(([id, k]) => { if (String(row[k]).trim()) desc[id] = String(row[k]).trim(); }); if (!/flow|value/i.test(label)) continue; }
+        rows.push({label, unit: uc >= 0 ? String(row[uc] || '').trim() : ''});
+        idCols.forEach(([id, k]) => colValues[id].push(String(row[k] == null ? '' : row[k]).trim()));
+      }
+      if (rows.length >= 4) out.push({sheet: name, ids: idCols.map(x => x[0]), rows, colValues, desc, source: 'xlsx'});
+    }
+  }
+  return out;
+}
+
+/* =====================================================================
+   3. Reading files (browser only)
+   ===================================================================== */
+const S = {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, ctl: null, running: false};
+let fileSeq = 0;
+
+async function readPdf(entry) {
+  await needPdf();
+  const doc = await pdfjsLib.getDocument({data: await entry.file.arrayBuffer(), isEvalSupported: false, useSystemFonts: true}).promise;
+  entry.doc = doc; entry.pages = doc.numPages;
+  const U = pdfjsLib.Util, O = pdfjsLib.OPS;
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p), vp = page.getViewport({scale: 1});
+    const tc = await page.getTextContent();
+    const items = [];
+    for (const t of tc.items) {
+      const s = (t.str || '').trim(); if (!s) continue;
+      const [a, b, c, d, e, f] = t.transform, ul = Math.hypot(a, b) || 1, vl = Math.hypot(c, d) || 1, h = t.height || vl;
+      const P = [[e, f], [e + a / ul * t.width, f + b / ul * t.width], [e + c / vl * h, f + d / vl * h], [e + a / ul * t.width + c / vl * h, f + b / ul * t.width + d / vl * h]]
+        .map(q => vp.convertToViewportPoint(q[0], q[1]));
+      const xs = P.map(q => q[0] / vp.width), ys = P.map(q => q[1] / vp.height);
+      items.push({s, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys)});
+    }
+    items.sort((p1, p2) => p1.y0 - p2.y0 || p1.x0 - p2.x0);
+    // embedded raster images (stream tables are often pasted as scans)
+    const imgs = [];
+    try {
+      const ops = await page.getOperatorList(); let ctm = [1, 0, 0, 1, 0, 0]; const st = [];
+      const paint = new Set([O.paintImageXObject, O.paintImageMaskXObject, O.paintInlineImageXObject, O.paintImageXObjectRepeat]);
+      for (let i = 0; i < ops.fnArray.length; i++) {
+        const fn = ops.fnArray[i], ar = ops.argsArray[i];
+        if (fn === O.save) st.push(ctm.slice()); else if (fn === O.restore) ctm = st.pop() || [1, 0, 0, 1, 0, 0];
+        else if (fn === O.transform) ctm = U.transform(ctm, ar);
+        else if (fn === O.paintFormXObjectBegin) { st.push(ctm.slice()); if (ar && ar[0]) ctm = U.transform(ctm, ar[0]); }
+        else if (fn === O.paintFormXObjectEnd) ctm = st.pop() || ctm;
+        else if (paint.has(fn)) {
+          const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(q => vp.convertToViewportPoint(...U.applyTransform(q, ctm)));
+          const bx = [Math.min(...pts.map(q => q[0])) / vp.width, Math.min(...pts.map(q => q[1])) / vp.height, Math.max(...pts.map(q => q[0])) / vp.width, Math.max(...pts.map(q => q[1])) / vp.height];
+          if ((bx[2] - bx[0]) * (bx[3] - bx[1]) > 0.03) imgs.push(bx);
+        }
+      }
+    } catch (e) { /* operator list is best-effort */ }
+    const {own, aliases} = sheetIdentity(items);
+    const title = (() => { const a = items.find(it => /PROCESS FLOW DIAGRAM/.test(it.s)); if (!a) return '';
+      const cx = (a.x0 + a.x1) / 2; // title-block lines are centred under the "PROCESS FLOW DIAGRAM" line
+      return items.filter(b => b !== a && b.y0 > a.y0 + 0.002 && b.y0 - a.y1 < 0.03 && Math.abs((b.x0 + b.x1) / 2 - cx) < 0.06).sort((p1, p2) => p1.y0 - p2.y0).slice(0, 3).map(x => x.s).join(' ').slice(0, 110); })();
+    const conns = connectorsOf(items, own, aliases);
+    const badges = [...new Set(items.filter(it => isBadge(it.s) && it.y0 < 0.86).flatMap(it => it.s.split(/\s+/)))];
+    const textTable = parseTextTable(items);
+    S.sheets.push({key: entry.file.name + ' p' + p, fileId: entry.id, file: entry.file.name, page: p, dwg: own, aliases, title,
+                   connectors: conns, badges, items, imgs, textLayer: items.length > 40, textTable, rotate: page.rotate});
+    entry.status = `${p}/${doc.numPages}장 읽음`; renderFiles(); await sleep0();
+  }
+}
+async function readXlsx(entry) {
+  await loadScript(CDN.xlsx);
+  const wb = XLSX.read(await entry.file.arrayBuffer(), {type: 'array'});
+  const t = parseXlsxTables(wb); t.forEach(x => x.file = entry.file.name);
+  S.xlsxTables.push(...t); entry.pages = wb.SheetNames.length;
+  entry.note = t.length ? `Stream 표 ${t.length}개` : 'Stream 표를 찾지 못함';
+}
+async function readDocx(entry) {
+  await loadScript(CDN.mammoth);
+  const r = await mammoth.extractRawText({arrayBuffer: await entry.file.arrayBuffer()});
+  entry.text = (r.value || '').trim(); entry.note = `${entry.text.length.toLocaleString()}자`;
+}
+async function addFiles(list) {
+  for (const f of list) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    const entry = {id: ++fileSeq, file: f, kind: ext, status: '대기', pages: null};
+    if (!['pdf', 'xlsx', 'docx'].includes(ext)) { entry.status = '지원하지 않는 형식'; entry.bad = true; }
+    else if (f.size > 20 * 1048576) { entry.status = '20MB 초과'; entry.bad = true; }
+    S.files.push(entry);
+  }
+  renderFiles();
+  for (const e of S.files.filter(x => x.status === '대기')) {
+    e.status = '읽는 중'; renderFiles();
+    try {
+      if (e.kind === 'pdf') await readPdf(e); else if (e.kind === 'xlsx') await readXlsx(e); else await readDocx(e);
+      e.status = '완료'; e.ok = true;
+    } catch (err) { e.status = '읽기 실패: ' + (err.message || err); e.bad = true; }
+    renderFiles();
+  }
+  S.links = buildLinks(S.sheets);
+  S.docText = S.files.filter(e => e.text).map(e => `# ${e.file.name}\n${e.text}`).join('\n\n').slice(0, 20000);
+  renderLocal();
+}
+function removeFile(id) {
+  S.files = S.files.filter(e => e.id !== id);
+  S.sheets = S.sheets.filter(s => s.fileId !== id);
+  S.xlsxTables = S.xlsxTables.filter(t => S.files.some(e => e.file.name === t.file));
+  S.links = buildLinks(S.sheets); renderFiles(); renderLocal();
+}
+function renderFiles() {
+  const T = $('#files');
+  if (!S.files.length) { T.innerHTML = ''; return; }
+  T.innerHTML = `<thead><tr><th>파일</th><th>형식</th><th>장/시트</th><th>크기</th><th style="text-align:left">상태</th><th></th></tr></thead><tbody>${S.files.map(e =>
+    `<tr><td class="l" style="overflow-wrap:anywhere">${esc(e.file.name)}</td><td class="num">${esc(e.kind.toUpperCase())}</td><td class="num">${e.pages ?? '–'}</td><td class="num">${kb(e.file.size)}</td><td class="st ${e.bad ? 'bad' : e.ok ? 'ok' : ''}">${esc(e.status)}${e.note ? ' · ' + esc(e.note) : ''}</td><td><button type="button" class="link" data-rm="${e.id}" aria-label="${esc(e.file.name)} 빼기">빼기</button></td></tr>`).join('')}</tbody>`;
+  T.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => removeFile(+b.dataset.rm));
+}
+function renderLocal() {
+  const L = S.links, sh = S.sheets;
+  const box = $('#local');
+  if (!sh.length && !S.xlsxTables.length) { box.innerHTML = ''; updateGen(); return; }
+  const noText = sh.filter(s => !s.textLayer).length, imgTables = sh.filter(s => s.imgs.length && !s.textTable).length;
+  box.innerHTML = [
+    ['시트', sh.length + '장', ''], ['시트 간 연결 확인', L ? `${L.matched}건` : '–', ''],
+    ['연결 확인 필요', L ? `${L.issues}건` : '–', L && L.issues ? 'warn' : ''], ['입력에 없는 도면', L ? `${L.missingCount}개` : '–', ''],
+    ['표가 이미지인 시트', imgTables + '장', imgTables ? 'warn' : ''], ['XLSX Stream 표', S.xlsxTables.length + '개', ''],
+    ...(noText ? [['텍스트 없는 시트(스캔본)', noText + '장', 'warn']] : [])
+  ].map(([k, v, c]) => `<div class="sum"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+  // suggestions from sheet titles
+  const words = new Set();
+  sh.forEach(s => { const t = s.title.toUpperCase(); if (/STEAM/.test(t)) words.add('스팀 계통'); if (/WATER/.test(t)) words.add('용수 계통'); if (/AIR/.test(t)) words.add('압축공기 계통'); if (/LIM/.test(t)) words.add('Liming 공정'); if (/CARBONAT/.test(t)) words.add('탄산화 공정'); });
+  $('#suggest').innerHTML = [...words].slice(0, 6).map(w => `<button type="button" class="chip" data-w="${esc(w)}">${esc(w)}</button>`).join('');
+  $('#suggest').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { $('#system').value = b.dataset.w; updateGen(); });
+  updateGen();
+}
+function updateGen() { $('#gen').disabled = S.running || !S.sheets.length || !$('#system').value.trim(); }
+
+/* =====================================================================
+   4. Rendering pieces of a page for Claude
+   ===================================================================== */
+async function pageOf(sh) { const e = S.files.find(x => x.id === sh.fileId); return e.doc.getPage(sh.page); }
+async function renderRegion(sh, box, targetW) {
+  const page = await pageOf(sh), vp1 = page.getViewport({scale: 1});
+  const scale = Math.min(8, targetW / ((box[2] - box[0]) * vp1.width)), vp = page.getViewport({scale});
+  const cw = Math.max(1, Math.round((box[2] - box[0]) * vp.width)), ch = Math.max(1, Math.round((box[3] - box[1]) * vp.height));
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);
+  await page.render({canvasContext: ctx, viewport: vp, transform: [1, 0, 0, 1, -box[0] * vp.width, -box[1] * vp.height]}).promise;
+  return c;
+}
+const toBlob = (c, type = 'image/png', q) => new Promise(r => c.toBlob(r, type, q));
+function vLines(c) {
+  const ctx = c.getContext('2d'), W = c.width, H = c.height, d = ctx.getImageData(0, 0, W, H).data, cnt = new Uint32Array(W);
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (d[i] + d[i + 1] + d[i + 2] < 300) cnt[x]++; }
+  const xs = []; const thr = (H / 2) * 0.55;
+  for (let x = 0; x < W; x++) if (cnt[x] > thr) { if (xs.length && x - xs[xs.length - 1][1] <= 3) xs[xs.length - 1][1] = x; else xs.push([x, x]); }
+  return xs.map(([a, b]) => Math.round((a + b) / 2));
+}
+function stitch(c, parts) {
+  const w = parts.reduce((s, [a, b]) => s + (b - a), 0), out = document.createElement('canvas'); out.width = w; out.height = c.height;
+  const ctx = out.getContext('2d'); let x = 0;
+  for (const [a, b] of parts) { ctx.drawImage(c, a, 0, b - a, c.height, x, 0, b - a, c.height); x += b - a; }
+  return out;
+}
+/* Split a stream-table image into strips: label + unit columns repeated, then a few stream columns each. */
+async function tableStrips(sh, box) {
+  const c = await renderRegion(sh, box, 4600), xs = vLines(c);
+  if (xs.length < 6) { // no grid found: two halves with overlap
+    const W = c.width; return {strips: [stitch(c, [[0, Math.round(W * 0.55)]]), stitch(c, [[0, Math.round(W * 0.22)], [Math.round(W * 0.45), W]])], canvas: c};
+  }
+  const label = [xs[0], xs[2]], cols = []; for (let i = 2; i < xs.length - 1; i++) cols.push([xs[i], xs[i + 1]]);
+  const per = Math.max(3, Math.min(7, Math.floor((2600 - (label[1] - label[0])) / Math.max(60, (cols[0][1] - cols[0][0])))));
+  const strips = []; for (let i = 0; i < cols.length; i += per) strips.push(stitch(c, [label, [cols[i][0], cols[Math.min(cols.length, i + per) - 1][1]]]));
+  return {strips, canvas: c};
+}
+async function diagramTiles(sh, n) {
+  const tb = sh.imgs[0], y1 = Math.min(0.86, tb ? Math.max(0.5, tb[1]) : 0.86); // diagram area above the table / title block
+  const boxes = n >= 4 ? [[0, 0, .52, y1 * .55], [.48, 0, 1, y1 * .55], [0, y1 * .45, .52, y1], [.48, y1 * .45, 1, y1]]
+              : n >= 2 ? [[0, 0, .52, y1], [.48, 0, 1, y1]] : [[0, 0, 1, y1]];
+  const out = []; for (const b of boxes) out.push(await toBlob(await renderRegion(sh, b, 2000), 'image/jpeg', 0.85));
+  return out;
+}
+
+/* =====================================================================
+   5. Claude calls (scope, per-sheet connections, image tables)
+   ===================================================================== */
+const ERR = {not_granted: 'Claude 사용이 허용되지 않았습니다.', sampling_disabled: '이 계정에서는 Claude를 쓸 수 없습니다.', rate_limited: '요청이 많아 잠시 뒤 다시 시도해 주세요.',
+  session_expired: '다시 로그인해야 합니다.', images_unavailable: '이 화면에서는 이미지를 보낼 수 없습니다.', prompt_too_large: '보낼 내용이 너무 큽니다.', invalid_json: 'Claude 답을 읽지 못했습니다.',
+  refused: 'Claude가 이 요청을 처리하지 않았습니다.', cancelled: '중지했습니다.'};
+const errText = e => ERR[e && e.code] || ('Claude 호출 실패' + (e && e.code ? ` (${e.code})` : ''));
+let SAMPLE = null, LIM = null, calls = 0;
+async function ask(prompt, images, tier) {
+  calls++;
+  const opt = {signal: S.ctl.signal, modelTier: tier || 'default'};
+  if (images && images.length) opt.images = images;
+  return SAMPLE.json(prompt, opt);
+}
+const short = d => (d || '').replace(/^.*?-(\d{4}-[A-Z]{2}-[A-Z]{3}-\d+)$/, '$1');
+
+function scopePrompt(system) {
+  const lines = S.sheets.map(s => `${s.dwg || '(번호 없음)'} | ${s.title || '-'} | ${s.key} | 도면 위 Stream 번호: ${s.badges.slice(0, 80).join(', ')}`);
+  const conns = S.links.flows.map(f => `${f.sheet}: ${f.dir} ${f.stream || '-'} ${f.dir === 'TO' ? '→' : '←'} ${f.dwg}${f.target ? '' : ' (입력에 없음)'} | ${f.label} ${f.detail}`);
+  return `[[SCOPE]]
+너는 공정 설계 엔지니어다. 아래는 사용자가 올린 PFD 시트 목록, 시트 사이 연결 표시(off-page connector), 시트마다 도면에 적힌 Stream 번호다.
+사용자가 그리려는 계통: "${system}"
+
+할 일: 이 계통을 그리는 데 필요한 시트와 Stream을 고른다.
+- mainSheets: 이 계통 자체를 그린 시트(그 시트의 Stream은 전부 계통에 포함).
+- sideSheets: 다른 공정 시트 중 이 계통의 Stream이 이어지는 시트와, 그 시트에서 따라갈 Stream 번호.
+- streams: 포함할 Stream 전부. 연결 표시 설명으로 성격을 알 수 있으면 cat과 ko를 채우고, 모르면 cat은 비워 둔다.
+- categories: 라인 종류(최대 7개). key는 영문 소문자, label은 한국어(압력·온도 같은 구분이 보이면 포함).
+- 목록에 있는 도면 번호와 Stream 번호만 쓴다. 지어내지 않는다.
+
+출력은 JSON 하나만:
+{"title":"짧은 한국어 계통 이름","summary":"이 계통을 2~3문장으로","mainSheets":["도면번호"],"sideSheets":[{"dwg":"도면번호","streams":["980"]}],"categories":[{"key":"steam","label":"고압증기"}],"streams":[{"id":"980","cat":"steam","ko":"짧은 한국어 이름"}]}
+
+## 시트 (도면 번호 | 제목 | 파일·페이지 | 도면 위 Stream 번호)
+${lines.join('\n')}
+
+## 시트 사이 연결 (시트: 방향 Stream → 상대 도면 | 설명)
+${conns.join('\n')}
+${S.docText ? '\n## 참고 문서(운전 설명 등, 일부)\n' + S.docText.slice(0, 8000) : ''}`;
+}
+function topoPrompt(sh, streams, cats, nTiles) {
+  const its = sh.items.filter(it => it.y0 < 0.86 && !sh.imgs.some(b => it.x0 > b[0] && it.x1 < b[2] && it.y0 > b[1] && it.y1 < b[3]))
+    .slice(0, 1200).map(it => `${it.s}|${it.x0.toFixed(3)}|${it.y0.toFixed(3)}`);
+  const cn = sh.connectors.filter(c => c.kind === 'flow').map(c => `${c.dir} ${c.stream || '-'} ${c.dwg} | ${c.label} ${c.detail}`);
+  const tiles = nTiles >= 4 ? '이미지 4장은 도면을 2×2로 나눈 조각(왼쪽 위, 오른쪽 위, 왼쪽 아래, 오른쪽 아래)이다.' : nTiles >= 2 ? '이미지 2장은 도면의 왼쪽 절반과 오른쪽 절반이다.' : nTiles === 1 ? '이미지 1장은 도면 전체다.' : '이미지는 없다. 글자 위치로 판단한다.';
+  return `[[TOPOLOGY ${sh.dwg}]]
+너는 공정 설계 엔지니어다. PFD 한 장(도면 번호 ${sh.dwg || '-'}, 제목 ${sh.title || '-'})에서 아래 Stream들이 어느 설비에서 어느 설비로 가는지 찾는다. ${tiles}
+글자 목록은 이 시트의 글자와 위치다(글자|x|y, 0~1, 왼쪽 위 기준). 설비 Tag는 글자 목록에 있는 그대로 쓴다.
+
+따라갈 Stream: ${streams.join(', ')}
+라인 종류(cat에 key 사용): ${cats.map(c => `${c.key}=${c.label}`).join(', ')}
+
+규칙
+- from/to는 설비 Tag(예: 6300-BO-005). 예비(SB) 설비가 함께 있으면 운전 설비 Tag 하나만 쓰고 이름에 예비를 적는다.
+- 이 시트 밖에서 들어오거나 밖으로 나가면 상대 도면 번호를 "OFF:도면번호"로 쓴다.
+- 도면 밖 공급원·배출처(대기, 공급사 등)는 "BL:짧은 이름"으로 쓴다.
+- 헤더·매니폴드처럼 Tag 없는 분배점은 "HDR:짧은 이름"으로 쓴다.
+- 확실하지 않으면 uncertain을 true로 한다. 보이지 않는 Stream은 빼고 missing에 적는다.
+- equipment에는 from/to에 쓴 설비 Tag만, 한국어 이름(ko)과 짧은 설명(what, 한 문장)을 넣는다.
+- notes에는 도면 Note 중 이 Stream들의 운전 조건(운전시간, 배치·간헐 운전, 재순환 비율 등)을 한국어 한 문장씩.
+
+출력은 JSON 하나만:
+{"equipment":[{"tag":"6300-BO-005","ko":"보일러 1","what":"포화증기 생산"}],"streams":[{"id":"875","from":"6300-BO-005","to":"HDR:고압증기 헤더","cat":"steam","ko":"보일러 1 증기","uncertain":false}],"missing":["999"],"notes":[{"stream":"877","text":"Note 18: 포화증기의 10%를 재순환"}]}
+
+## 시트 밖 연결 표시 (방향 Stream 상대도면 | 설명)
+${cn.join('\n') || '-'}
+
+## 글자 목록
+${its.join('\n')}`;
+}
+function tablePrompt(sh, ids, nImg) {
+  return `[[TABLE ${sh.dwg}]]
+이미지 ${nImg}장은 PFD(도면 ${sh.dwg || '-'})의 Stream Table을 세로로 나눈 조각이다. 조각마다 왼쪽에 항목명 열과 단위(Unit) 열이 반복된다.
+아래 Stream 번호의 열만 옮겨 적는다: ${ids.join(', ')}
+
+규칙
+- 값은 보이는 그대로 적는다. 쉼표·점·범위(4.5-5.5)·"NOTE 5" 같은 표기를 바꾸지 않는다. 계산하거나 추측하지 않는다.
+- 빈칸이나 "-"는 "-"로 적는다. 읽을 수 없으면 "?"로 적는다.
+- rows에는 표의 모든 행을 위에서 아래 순서로 넣는다. 구역 제목 행(BALANCE FLOW, NOMINAL FLOW, Average Value, Maximum Value, DESIGN FLOW, OTHER VALUES, CHEMICAL COMPOSITION - LIQUID 등)도 넣는다.
+- columns의 values는 rows와 같은 순서, 같은 개수다. description에는 Stream 머리글의 설명을 그대로 적는다.
+- 목록에 있는데 표에 없는 Stream은 notFound에 넣는다.
+
+출력은 JSON 하나만:
+{"rows":[{"label":"BALANCE FLOW","unit":""},{"label":"Daily Mass Flow","unit":"t/d"}],"columns":[{"stream":"980","description":"Saturated steam to ...","values":["-","132"]}],"notFound":["999"]}`;
+}
+
+/* =====================================================================
+   6. Generation pipeline
+   ===================================================================== */
+const STEP_DEFS = [
+  ['read', '파일 읽기', '브라우저'], ['sheets', '시트 식별·시트 간 연결', '브라우저'], ['scope', '계통 범위 판단', 'Claude'],
+  ['topo', '시트 안 연결 해석', 'Claude'], ['values', 'Stream 값 채우기', '브라우저·Claude'], ['check', '물질수지·시트 간 비교', '브라우저'],
+  ['draw', '자동 배치·그리기', '브라우저']];
+const stepState = {};
+function setStep(k, st, det) { stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps(); }
+function renderSteps() {
+  const ic = {wait: '·', run: '…', done: '✓', fail: '!', skip: '–'};
+  $('#steps').innerHTML = STEP_DEFS.map(([k, n, who]) => { const s = stepState[k] || {st: 'wait'};
+    return `<li class="${s.st}"><span class="ic" aria-hidden="true">${ic[s.st]}</span><span>${esc(n)}${s.det ? `<div class="det">${esc(s.det)}</div>` : ''}</span><span class="who ${/Claude/.test(who) ? 'ai' : ''}">${who}</span></li>`; }).join('');
+}
+function say(text, cls) { const m = $('#msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || ''; }
+
+async function generate() {
+  const system = $('#system').value.trim(); if (!system || S.running) return;
+  S.running = true; updateGen(); $('#stop').hidden = false; say('');
+  S.ctl = new AbortController(); calls = 0; Object.keys(stepState).forEach(k => delete stepState[k]);
+  setStep('read', 'done', `${S.files.filter(f => f.ok).length}개 파일`);
+  setStep('sheets', 'done', `${S.sheets.length}장 · 연결 ${S.links.flows.length}건 중 ${S.links.matched}건 양쪽 일치`);
+  try {
+    SAMPLE = window.claude ? await window.claude.use('sample') : null;
+    if (!SAMPLE) throw {code: 'unavailable_here'};
+    LIM = await SAMPLE.limits().catch(() => null);
+    const maxImg = (LIM && LIM.images && LIM.images.maxCount) || 0;
+
+    // ---- scope
+    setStep('scope', 'run', 'Claude 1회');
+    const sc = await ask(scopePrompt(system), null, 'default');
+    const findSheet = d => S.links.sheetOf(String(d || '')) ;
+    const main = [...new Set((sc.mainSheets || []).map(findSheet).filter(Boolean))];
+    const side = (sc.sideSheets || []).map(x => ({sh: findSheet(x.dwg), streams: (x.streams || []).map(String)})).filter(x => x.sh && !main.includes(x.sh));
+    if (!main.length) throw {code: 'no_scope', message: '계통에 해당하는 시트를 찾지 못했습니다. 계통 이름을 바꿔 보세요.'};
+    const cats = (sc.categories || []).filter(c => c && c.key).slice(0, 7);
+    if (!cats.length) cats.push({key: 'flow', label: '공정 흐름'});
+    const scopeStreams = {}; (sc.streams || []).forEach(s => scopeStreams[String(s.id)] = s);
+    setStep('scope', 'done', `${sc.title || system} · 주 시트 ${main.length}장, 연결 시트 ${side.length}장`);
+
+    // ---- topology per sheet
+    const work = [...main.map(sh => ({sh, streams: [...new Set([...sh.badges, ...sh.connectors.filter(c => c.kind === 'flow' && c.stream).map(c => c.stream)])], main: true})),
+                  ...side.map(x => ({sh: x.sh, streams: x.streams, main: false}))];
+    const nTiles = Math.min(4, maxImg);
+    const topo = [];
+    for (let i = 0; i < work.length; i++) {
+      const w = work[i]; setStep('topo', 'run', `${i + 1}/${work.length}장 · ${short(w.sh.dwg)} · Claude`);
+      const imgs = nTiles ? await diagramTiles(w.sh, nTiles) : null;
+      const r = await ask(topoPrompt(w.sh, w.streams, cats, nTiles), imgs, 'default');
+      topo.push({...w, r});
+    }
+    setStep('topo', 'done', `${work.length}장 · Claude ${work.length}회${nTiles ? '' : ' (이미지 없이 글자만)'}`);
+
+    // ---- values
+    setStep('values', 'run');
+    const inScope = new Set([...Object.keys(scopeStreams), ...topo.flatMap(t => (t.r.streams || []).map(s => String(s.id)))]);
+    const vals = {}; // id -> [{sheet, src, v, comp, compSolids, extraProps, desc, decimalComma}]
+    const addVals = (sheetDwg, src, tbl, mapped, dc) => { for (const id of Object.keys(mapped)) { if (!inScope.has(id)) continue; (vals[id] = vals[id] || []).push({sheet: sheetDwg, src, ...mapped[id], desc: (tbl.desc || {})[id] || '', decimalComma: dc}); } };
+    let imgCalls = 0;
+    for (const w of work) {
+      const sh = w.sh, ids = [...new Set((w.r = topo.find(t => t.sh === sh).r, (w.r.streams || []).map(s => String(s.id))))];
+      if (!ids.length) continue;
+      if (sh.textTable) { const t = sh.textTable; const dc = looksDecimalComma(Object.values(t.colValues).flat()); addVals(sh.dwg, 'text', t, mapRows(t.rows, t.ids, t.colValues), dc); continue; }
+      if (!sh.imgs.length || !maxImg) continue;
+      setStep('values', 'run', `${short(sh.dwg)} 표 이미지 판독 · Claude`);
+      const {strips} = await tableStrips(sh, sh.imgs[0]);
+      for (let k = 0; k < strips.length; k += maxImg) {
+        const part = strips.slice(k, k + maxImg), blobs = []; for (const c of part) blobs.push(await toBlob(c));
+        const r = await ask(tablePrompt(sh, ids, blobs.length), blobs, 'default'); imgCalls++;
+        const rows = (r.rows || []).map(x => ({label: String(x.label || ''), unit: String(x.unit || '')}));
+        const colValues = {}, desc = {};
+        (r.columns || []).forEach(c => { const id = String(c.stream); if (!ids.includes(id)) return; colValues[id] = (c.values || []).map(v => String(v)); desc[id] = c.description || ''; });
+        const got = Object.keys(colValues); if (!got.length) continue;
+        const dc = looksDecimalComma(Object.values(colValues).flat());
+        addVals(sh.dwg, 'image', {desc}, mapRows(rows, got, colValues), dc);
+      }
+    }
+    for (const t of S.xlsxTables) addVals(`${t.file} · ${t.sheet}`, 'xlsx', t, mapRows(t.rows, t.ids, t.colValues), looksDecimalComma(Object.values(t.colValues).flat()));
+    setStep('values', 'done', `${Object.keys(vals).length}개 Stream · 표 이미지 판독 Claude ${imgCalls}회`);
+
+    // ---- assemble + checks + layout
+    setStep('check', 'run');
+    const D = assemble({system, sc, cats, topo, vals, main, side});
+    setStep('check', 'done', `${D.checks.length}개 검사 · 시트 간 차이 ${D._diffs}건`);
+    setStep('draw', 'run'); await loadScript(CDN.dagre); layout(D); setStep('draw', 'done', `설비 ${D.nodes.length}개 · 라인 ${D.lines.length}개`);
+    delete D._diffs; D.meta.generated = {at: new Date().toISOString(), calls};
+    S.result = D; showResult(D, false);
+    say(`완료: Claude ${calls}회 호출. 자동 해석 결과이므로 '확인 필요' 표시와 물질수지 경고를 먼저 확인하세요.`);
+  } catch (e) {
+    const k = Object.keys(stepState).find(x => stepState[x].st === 'run'); if (k) setStep(k, 'fail');
+    if (e && e.code === 'unavailable_here') say('Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다. 시트 확인 결과와 저장된 흐름도 열기는 여기서도 됩니다.', 'warn');
+    else if (e && e.code === 'no_scope') say(e.message, 'warn');
+    else if (e && e.code) say(errText(e), e.code === 'cancelled' ? '' : 'bad');
+    else { console.error(e); say('생성 중 오류: ' + (e && e.message || e), 'bad'); }
+  } finally { S.running = false; $('#stop').hidden = true; updateGen(); }
+}
+
+/* Merge per-sheet answers into one graph + the viewer data. */
+const PALETTE = [['#b02a1f', '#ff6f61'], ['#d26a12', '#ffa152'], ['#1d5fae', '#6ea9ff'], ['#6a4bc0', '#ad97ff'], ['#0d8478', '#45c9b9'], ['#6b7480', '#9aa4b0'], ['#a07400', '#f0c04a'], ['#b0306a', '#ff7fb5']];
+function assemble({system, sc, cats, topo, vals, main, side}) {
+  const categories = {}; cats.forEach((c, i) => categories[c.key] = {label: c.label, light: PALETTE[i % 8][0], dark: PALETTE[i % 8][1]});
+  const catOf = k => categories[k] ? k : Object.keys(categories)[0];
+  const nodes = {}, nodeInfo = {}, recs = {}; // recs[stream] = [{sheet, from, to, unc}]
+  const nodeKey = (raw, sh) => {
+    const v = String(raw || '').trim(); if (!v) return null;
+    if (/^OFF:/i.test(v)) return {off: normDwg(v.slice(4))};
+    if (/^BL:/i.test(v)) return {id: 'BL:' + v.slice(3).trim(), title: v.slice(3).trim(), src: true};
+    if (/^HDR:/i.test(v)) return {id: 'HDR:' + short(sh.dwg) + ':' + v.slice(4).trim(), title: v.slice(4).trim(), hdr: true};
+    return {id: v.toUpperCase(), title: v};
+  };
+  const notesBy = {};
+  for (const t of topo) {
+    const eq = {}; (t.r.equipment || []).forEach(e => eq[String(e.tag || '').toUpperCase()] = e);
+    (t.r.notes || []).forEach(n => (notesBy[String(n.stream)] = notesBy[String(n.stream)] || []).push(String(n.text || '')));
+    for (const s of (t.r.streams || [])) {
+      const id = String(s.id), f = nodeKey(s.from, t.sh), to = nodeKey(s.to, t.sh); if (!f || !to) continue;
+      for (const n of [f, to]) if (n.id && !nodes[n.id]) {
+        const e = eq[n.id] || {};
+        nodes[n.id] = {id: n.id, title: e.ko || n.title, sub: n.src || n.hdr ? (n.hdr ? '분배 헤더' : '도면 밖') : n.id, src: !!n.src, sheet: t.sh.dwg};
+        nodeInfo[n.id] = {title: e.ko || n.title, tags: n.src ? '배터리 리밋' : n.hdr ? `${short(t.sh.dwg)} 분배 헤더` : `${n.id} · ${short(t.sh.dwg)}`, info: [e.what].filter(Boolean), links: []};
+      }
+      (recs[id] = recs[id] || []).push({sheet: t.sh, from: f, to, unc: !!s.uncertain, cat: s.cat, ko: s.ko});
+    }
+  }
+  // stitch off-page halves of the same stream across sheets
+  const edges = [];
+  const blFor = (sh, off, id, dir) => {
+    const target = S.links.sheetOf(off), con = sh.connectors.find(c => c.kind === 'flow' && c.stream === id && canon(c.dwg) === canon(off)) || {};
+    const nid = 'OFF:' + canon(off) + ':' + (dir === 'in' ? 'from' : 'to');
+    if (!nodes[nid]) {
+      nodes[nid] = {id: nid, title: (con.label || (dir === 'in' ? '들어오는 흐름' : '나가는 흐름')).slice(0, 26), sub: (dir === 'in' ? '← ' : '→ ') + short(off), src: true};
+      nodeInfo[nid] = {title: con.label || '시트 밖 연결', tags: off, info: [target ? `입력에 있는 시트(${target.key})지만 이 계통 범위에 넣지 않았습니다.` : '이 도면은 입력에 없습니다.', con.detail || ''].filter(Boolean), links: []};
+    }
+    return nid;
+  };
+  for (const [id, rs] of Object.entries(recs)) {
+    const used = new Set();
+    rs.forEach((a, i) => {
+      if (used.has(i)) return;
+      if (a.to.off) { // look for the other half: sheet a.to.off has this stream coming FROM a.sheet
+        const j = rs.findIndex((b, k) => k !== i && !used.has(k) && b.from.off && S.links.sheetOf(a.to.off) === b.sheet && S.links.sheetOf(b.from.off) === a.sheet);
+        if (j >= 0) { used.add(i); used.add(j); edges.push({id, from: a.from, to: rs[j].to, unc: a.unc || rs[j].unc, sheets: [a.sheet, rs[j].sheet]}); return; }
+      }
+      used.add(i); edges.push({id, from: a.from, to: a.to, unc: a.unc, sheets: [a.sheet], base: a.sheet});
+    });
+  }
+  const finalEdges = edges.map(e => {
+    const sh = e.sheets[0];
+    const from = e.from.off ? blFor(sh, e.from.off, e.id, 'in') : e.from.id, to = e.to.off ? blFor(e.sheets[e.sheets.length - 1], e.to.off, e.id, 'out') : e.to.id;
+    return {...e, from, to};
+  }).filter(e => e.from && e.to && e.from !== e.to);
+  // streams
+  const streams = {}; let diffs = 0;
+  const allIds = [...new Set(finalEdges.map(e => e.id))];
+  for (const id of allIds) {
+    const rs = recs[id] || [], sc0 = (sc.streams || []).find(x => String(x.id) === id) || {};
+    const vs = vals[id] || [];
+    const pref = vs.find(v => v.src === 'xlsx') || vs.find(v => v.src === 'text') || vs.find(v => main.some(m => m.dwg === v.sheet)) || vs[0];
+    const es = finalEdges.filter(e => e.id === id);
+    const s = {cat: catOf((rs.find(r => r.cat) || {}).cat || sc0.cat), ko: (rs.find(r => r.ko) || {}).ko || sc0.ko || '', en: pref ? pref.desc : '',
+      from: es.map(e => nodes[e.from] ? nodes[e.from].title : e.from).join(', '), to: es.map(e => nodes[e.to] ? nodes[e.to].title : e.to).join(', '),
+      sheet: [...new Set(rs.map(r => r.sheet.dwg))].join(' · '), note: [], sheets: [...new Set(rs.map(r => `${r.sheet.dwg} (${r.sheet.key})`))]};
+    if (pref) {
+      s.v = pref.v; if (pref.comp.length) s.comp = pref.comp.map(([n, v, u]) => [n, v, u]); if (pref.compSolids.length) s.compSolids = pref.compSolids;
+      if (pref.extraProps.length) s.extraProps = pref.extraProps; s.decimalComma = pref.decimalComma; s.valueSrc = pref.src;
+      s.note.push(pref.src === 'image' ? `값: ${pref.sheet} 표 이미지를 Claude가 판독한 값입니다. 원본 표와 대조해 주세요.` : pref.src === 'xlsx' ? `값: ${pref.sheet} 엑셀 셀 값입니다.` : `값: ${pref.sheet} 텍스트에서 읽은 값입니다.`);
+      if (!s.comp && !s.compSolids) s.compNote = '표에 이 라인의 성분 값이 없습니다.';
+      for (const o of vs) { if (o === pref) continue;
+        const dif = ['dm', 'nm', 'dsm', 'T', 'P'].filter(k => !dash(o.v[k]) && !dash(pref.v[k]) && numParse(o.v[k], o.decimalComma) !== numParse(pref.v[k], pref.decimalComma));
+        if (dif.length) { diffs++; s.note.push(`${o.sheet}${o.src === 'image' ? '(표 이미지)' : ''}에는 ` + dif.map(k => `${({dm: '일 유량', nm: 'Nominal', dsm: 'Design', T: '온도', P: '압력'})[k]} ${o.v[k]}`).join(', ') + '로 적혀 있습니다.'); }
+      }
+    } else s.note.push('표에서 이 Stream의 값을 찾지 못했습니다.');
+    if (rs.some(r => r.unc)) { s.flag = '연결 확인 필요'; s.note.push('연결: Claude가 도면 이미지에서 확실하지 않다고 답한 연결입니다.'); }
+    (notesBy[id] || []).forEach(n => s.note.push(n));
+    streams[id] = s;
+  }
+  finalEdges.forEach(e => { [e.from, e.to].forEach(n => { if (nodeInfo[n] && !nodeInfo[n].links.includes(e.id)) nodeInfo[n].links.push(e.id); }); });
+  // per-equipment balance checks (daily mass), only where every stream has a value
+  const checks = [];
+  for (const n of Object.values(nodes)) {
+    if (n.src) continue;
+    const ins = [...new Set(finalEdges.filter(e => e.to === n.id).map(e => e.id))], outs = [...new Set(finalEdges.filter(e => e.from === n.id).map(e => e.id))];
+    if (!ins.length || !outs.length) continue;
+    const val = id => streams[id] && streams[id].v ? numParse(streams[id].v.dm, streams[id].decimalComma) : NaN;
+    if (![...ins, ...outs].every(id => Number.isFinite(val(id)))) continue;
+    const L = ins.reduce((a, id) => a + val(id), 0);
+    checks.push({name: `${n.title} 입·출`, lhs: ins, rhs: outs, field: 'dm', unit: 't/d', tol: Math.max(1, L * 0.02), _w: L});
+  }
+  checks.sort((a, b) => b._w - a._w); checks.splice(8); checks.forEach(c => delete c._w);
+  const sheetList = [...main, ...side.map(x => x.sh)];
+  return {
+    meta: {docTitle: (sc.title || system).slice(0, 40), eyebrow: `자동 생성 · 시트 ${sheetList.length}장 · ${new Date().toLocaleDateString('ko-KR')}`, title: sc.title || system, lede: sc.summary || '',
+      hint: '자동 생성 결과입니다. 연결은 Claude가 도면을 해석한 것이고, 표가 이미지인 시트의 값은 Claude가 판독한 값입니다. 점선 테두리 설비와 \'확인 필요\' 라인을 먼저 확인하세요. 물질수지는 하루 합계(t/d) 기준입니다.',
+      sheets: S.sheets.map(s => ({dwg: s.dwg, title: s.title, file: s.file, page: s.page})),
+      sheetLinks: {matched: S.links.matched, issues: S.links.issues, missing: S.links.missingCount}, minWidth: 1000},
+    categories, checks, streams, nodes: Object.values(nodes), nodeInfo, edges: finalEdges.map(e => ({id: e.id, from: e.from, to: e.to, unc: e.unc})), _diffs: diffs
+  };
+}
+
+/* Layered layout (dagre) → node boxes, polylines and badge positions in the viewer format. */
+function layout(D) {
+  const g = new dagre.graphlib.Graph({multigraph: true});
+  g.setGraph({rankdir: 'LR', nodesep: 26, ranksep: 90, edgesep: 14, marginx: 24, marginy: 24});
+  g.setDefaultEdgeLabel(() => ({}));
+  const size = n => n.src ? [170, 46] : [190, 64];
+  D.nodes.forEach(n => { const [w, h] = size(n); g.setNode(n.id, {width: w, height: h}); });
+  D.edges.forEach((e, i) => g.setEdge(e.from, e.to, {width: 20 + (D.streams[e.id].label || e.id).length * 8, height: 22, labelpos: 'c'}, 'e' + i));
+  dagre.layout(g);
+  const gr = g.graph();
+  D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = size(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src}; });
+  D.lines = D.edges.map((e, i) => { const ed = g.edge({v: e.from, w: e.to, name: 'e' + i}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
+  D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
+  delete D.edges;
+}
+
+/* =====================================================================
+   7. Viewer (same behaviour as the skill's viewer template)
+   ===================================================================== */
+const FLOW_ROWS = [['Balance · 일 합계', 'dm', 'dv', 't/d', 'm³/d'], ['Nominal · 평균', 'nm', 'nv'], ['Nominal · 최대', 'nxm', 'nxv'], ['Nominal · 최소', 'nnm', 'nnv'], ['Design · 평균', 'dsm', 'dsv'], ['Design · 최대', 'dxm', 'dxv'], ['Design · 최소', 'dnm', 'dnv']];
+const PROP_ROWS = [['Density', 't/m³', 'rho'], ['Temperature', '°C', 'T'], ['Pressure (abs)', 'bar', 'P'], ['% Solids', '%', 'sol'], ['% Liquid', '%', 'liq'], ['Li⁺', 'ppm', 'li'], ['pH', '—', 'pH'], ['Design Factor', '—', 'DF'], ['Run Time', 'h/d', 'RT']];
+const KPI_DEFAULT = [['Nominal 질량유량', 'nm', 't/h'], ['Design 질량유량', 'dsm', 't/h'], ['온도', 'T', '°C'], ['압력', 'P', 'bar(a)']];
+const NS = 'http://www.w3.org/2000/svg';
+let V = null; // current viewer data
+function renderViewer(D) {
+  V = D; const M = D.meta || {}, CATS = D.categories || {}, ST = D.streams || {}, NI = D.nodeInfo || {};
+  const lab = id => ST[id] ? (ST[id].label || (ST[id].info ? '—' : id)) : id;
+  $('#v-eyebrow').textContent = M.eyebrow || ''; $('#v-title').textContent = M.title || ''; $('#v-lede').textContent = M.lede || ''; $('#v-hint').textContent = M.hint || '';
+  document.title = M.docTitle ? M.docTitle : 'PFD 흐름도 만들기';
+  let st = document.getElementById('cat-style'); if (!st) { st = document.createElement('style'); st.id = 'cat-style'; document.head.appendChild(st); }
+  let lt = '', dk = '', rules = '';
+  for (const k in CATS) { const c = CATS[k]; lt += `--c-${k}:${c.light};`; dk += `--c-${k}:${c.dark || c.light};`; rules += `.c-${k}{stroke:var(--c-${k});color:var(--c-${k})}`; if (c.dashed) rules += `.ln.c-${k}{stroke-dasharray:7 4}`; }
+  st.textContent = `:root{${lt}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${dk}}}:root[data-theme="dark"]{${dk}}${rules}`;
+  $('#v-legend').innerHTML = Object.keys(CATS).map(k => `<span class="c-${k}"><i class="${CATS[k].dashed ? 'dash' : ''}"></i>${esc(CATS[k].label)}</span>`).join('');
+  // balance
+  const numOf = (id, f) => { const s = ST[id]; return s && s.v ? numParse(s.v[f], s.decimalComma) : NaN; };
+  const bal = $('#v-balance');
+  if (Array.isArray(D.checks) && D.checks.length) bal.innerHTML = D.checks.map(c => {
+    const f = c.field || 'dm', u = c.unit || 't/d', tol = c.tol == null ? 1 : c.tol, lv = c.lhs.map(id => numOf(id, f)), rv = c.rhs.map(id => numOf(id, f));
+    const miss = lv.concat(rv).some(x => !Number.isFinite(x)), ls = lv.reduce((a, b) => a + b, 0), rs = rv.reduce((a, b) => a + b, 0), diff = Math.abs(ls - rs), ok = !miss && diff <= tol;
+    const r = miss ? '⚠ 값이 없는 Stream이 있어 계산 불가' : `${ok ? '✓' : '⚠'} ${esc(c.rhsLabel || c.rhs.map(lab).join('·'))} = ${fmt(rs)} ${u}${diff > 0 ? ` · 차이 ${fmt(diff)}` : ''}`;
+    return `<div class="bal"><span class="k">${esc(c.name)}</span><span class="v">${esc(`${lv.map(fmt).join(' + ')} = ${fmt(ls)} ${u}`)}</span><span class="${ok ? 'ok' : 'warn'}">${r}</span></div>`; }).join('');
+  else if (Array.isArray(D.balance)) bal.innerHTML = D.balance.map(b => `<div class="bal"><span class="k">${esc(b.k)}</span><span class="v">${esc(b.v)}</span><span class="${b.warn ? 'warn' : 'ok'}">${esc(b.ok || '')}</span></div>`).join('');
+  else bal.innerHTML = '';
+  // sheets strip
+  const SH = M.sheets || [], box = $('#v-sheets'); box.hidden = !SH.length;
+  if (SH.length) { const L = M.sheetLinks;
+    $('#v-sheets-sum').innerHTML = `입력 시트 <b>${SH.length}장</b> · 파일 ${new Set(SH.map(x => x.file)).size}개` + (L ? ` · 시트 간 연결 <b>${L.matched}</b>건 확인` + (L.issues ? `, <b style="color:var(--warn)">${L.issues}건 확인 필요</b>` : '') + (L.missing ? ` · 입력에 없는 도면 ${L.missing}개` : '') : '');
+    $('#v-sheets-tbl').innerHTML = `<thead><tr><th>도면 번호</th><th style="text-align:left">제목</th><th>파일</th></tr></thead><tbody>${SH.map(x => `<tr><td class="num" style="text-align:left">${esc(x.dwg || '–')}</td><td class="l">${esc(x.title || '')}</td><td class="num">${esc(x.file)} p${esc(x.page)}</td></tr>`).join('')}</tbody>`; }
+  // diagram
+  const svg = $('#dia'), [VW, VH] = M.viewBox || [1600, 900];
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`); svg.setAttribute('aria-label', M.diagramLabel || M.title || '공정 흐름도');
+  if (M.minWidth) document.documentElement.style.setProperty('--svg-min', M.minWidth + 'px');
+  $('#gridbg').setAttribute('width', VW); $('#gridbg').setAttribute('height', VH);
+  const el = (t, a = {}, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+  const defs = $('#defs'); defs.querySelectorAll('marker').forEach(m => m.remove());
+  Object.keys(CATS).forEach(k => { const m = el('marker', {id: `arr-${k}`, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto'}, defs); el('path', {d: 'M0 0L10 5L0 10z', fill: `var(--c-${k})`}, m); });
+  const gF = $('#g-frames'), gL = $('#g-lines'), gN = $('#g-nodes'); [gF, gL, gN].forEach(g => g.innerHTML = '');
+  const onKey = fn => e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+  (D.frames || []).forEach(f => { el('rect', {x: f.x, y: f.y, width: f.w, height: f.h, rx: 4, class: 'frame'}, gF); if (f.title) el('text', {x: f.tx != null ? f.tx : f.x + 12, y: f.ty != null ? f.ty : f.y + f.h - 11, class: 'ftitle'}, gF).textContent = f.title; });
+  const groups = {};
+  const hex = (x, y, w) => { const h = 11, s = 7; return [[x - w / 2, y], [x - w / 2 + s, y - h], [x + w / 2 - s, y - h], [x + w / 2, y], [x + w / 2 - s, y + h], [x - w / 2 + s, y + h]].map(p => p.join(',')).join(' '); };
+  (D.lines || []).forEach(Ln => {
+    const sid = Ln.s || null, cat = Ln.cat || (sid && ST[sid] && ST[sid].cat) || Object.keys(CATS)[0];
+    const d = 'M' + Ln.pts.map(p => p.join(' ')).join(' L'), g = el('g', {class: 'g-line'}, gL);
+    el('path', {d, class: 'halo'}, g); el('path', {d, class: `ln c-${cat}${Ln.dashed ? ' dashed' : ''}`, 'marker-end': Ln.arrow === false ? '' : `url(#arr-${cat})`}, g);
+    if (sid && ST[sid]) {
+      const hit = el('path', {d, class: 'hit', tabindex: 0, role: 'button', 'aria-label': `Stream ${lab(sid)} ${ST[sid].ko || ''}`}, g);
+      hit.addEventListener('click', () => select(sid)); hit.addEventListener('keydown', onKey(() => select(sid)));
+      (groups[sid] = groups[sid] || []).push(g);
+      if (Ln.lab) { const t = lab(sid), w = 20 + t.length * 8, b = el('g', {class: `badge c-${cat}`}, g); el('polygon', {points: hex(Ln.lab[0], Ln.lab[1], w)}, b); el('text', {x: Ln.lab[0], y: Ln.lab[1] + .5}, b).textContent = t; b.addEventListener('click', () => select(sid)); }
+    }
+  });
+  (D.dots || []).forEach(([x, y]) => el('circle', {cx: x, cy: y, r: 3.2, class: 'dot'}, gL));
+  (D.bars || []).forEach(B => { const g = el('g', {tabindex: 0, role: 'button', 'aria-label': B.label || B.node}, gL); el('line', {x1: B.x1, y1: B.y1, x2: B.x2, y2: B.y2, class: `bar c-${B.cat}`}, g);
+    if (B.label) { const a = {x: B.lx, y: B.ly, class: `barlab c-${B.cat}`, 'text-anchor': 'middle', fill: 'currentColor'}; if (B.rotate) a.transform = `rotate(${B.rotate} ${B.lx} ${B.ly})`; el('text', a, g).textContent = B.label; }
+    if (B.node && NI[B.node]) { g.addEventListener('click', () => selectNode(B.node)); g.addEventListener('keydown', onKey(() => selectNode(B.node))); } });
+  (D.texts || []).forEach(T => { const a = {x: T.x, y: T.y, class: T.cls || 'conn'}; if (T.anchor) a['text-anchor'] = T.anchor; if (T.rotate) a.transform = `rotate(${T.rotate} ${T.x} ${T.y})`; el('text', a, gL).textContent = T.t; });
+  (D.nodes || []).forEach(n => {
+    const g = el('g', {class: 'node' + (n.src ? ' src' : ''), tabindex: 0, role: 'button', 'aria-label': n.title}, gN);
+    el('rect', {x: n.x, y: n.y, width: n.w, height: n.h, rx: 3}, g);
+    const rows = [[n.title, 't'], [n.sub, 's'], [n.sub2, n.sub2Strong ? 'p' : 's']].filter(r => r[0]), y0 = n.y + n.h / 2 - (rows.length - 1) * 8.5;
+    rows.forEach(([t, c], i) => { el('text', {x: n.x + 10, y: y0 + i * 17 + 4, class: c}, g).textContent = t; });
+    if (NI[n.id]) { g.addEventListener('click', () => selectNode(n.id)); g.addEventListener('keydown', onKey(() => selectNode(n.id))); }
+  });
+  // panel
+  const panel = $('#panel');
+  const chipsHTML = cur => { const gs = {}; Object.keys(ST).forEach(k => { if (!ST[k].info) (gs[ST[k].cat] = gs[ST[k].cat] || []).push(k); });
+    return '<div class="chipgroup"><h3>전체 Stream</h3>' + Object.keys(CATS).filter(c => gs[c]).map(c => `<div class="lab">${esc(CATS[c].label)}</div><div class="chips">${gs[c].map(k => `<button type="button" class="c-${c}" data-s="${esc(k)}" aria-pressed="${k === cur}">${esc(lab(k))}</button>`).join('')}</div>`).join('') + '</div>'; };
+  const notes = (n, warn) => n && n.length ? `<div class="note${warn ? ' warn' : ''}">${n.map(t => `<p>${esc(t)}</p>`).join('')}</div>` : '';
+  const comp = (t, c) => c && c.length && c.some(r => !dash(r[1])) ? `<div><h3>${t}</h3><table class="tbl"><tbody>${c.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[2] || '%')}</td><td class="num">${dash(r[1]) ? '–' : esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : '';
+  function renderStream(id) {
+    const s = ST[id], c = s.cat, v = s.v || {};
+    let h = `<div class="p-head"><div class="p-num c-${c}"><b>${esc(lab(id))}</b><span class="pill">${esc(CATS[c] ? CATS[c].label : c)}</span>${s.flag ? `<span class="pill flag">${esc(s.flag)}</span>` : ''}${s.valueSrc === 'image' ? '<span class="pill flag">이미지 판독값</span>' : ''}</div><div class="p-ko">${esc(s.ko || '')}</div>${s.en ? `<div class="p-name">${esc(s.en)}</div>` : ''}</div>`;
+    if (s.from || s.to || (s.sheets && s.sheets.length)) h += `<dl class="route"><dt>From</dt><dd>${esc(s.from || '–')}</dd><dt>To</dt><dd>${esc(s.to || '–')}</dd>${s.sheets && s.sheets.length ? `<dt>시트</dt><dd>${s.sheets.map(esc).join('<br>')}</dd>` : ''}</dl>`;
+    const kpi = s.kpi || (s.v ? KPI_DEFAULT.map(([k, f, u]) => [k, v[f], u]) : null);
+    if (kpi) h += `<div class="kpis">${kpi.map(([k, val, u]) => `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${dash(val) ? '–' : esc(val)}${dash(val) || !u ? '' : `<small>${esc(u)}</small>`}</div></div>`).join('')}</div>`;
+    if (s.v) {
+      const fr = FLOW_ROWS.filter(r => !(dash(v[r[1]]) && dash(v[r[2]])));
+      if (fr.length) h += `<div><h3>유량</h3><table class="tbl"><thead><tr><th></th><th>질량</th><th>체적</th></tr></thead><tbody>${fr.map(r => `<tr><td>${r[0]}</td><td class="num">${dash(v[r[1]]) ? '–' : esc(v[r[1]]) + ' ' + (r[3] || 't/h')}</td><td class="num">${dash(v[r[2]]) ? '–' : esc(v[r[2]]) + ' ' + (r[4] || 'm³/h')}</td></tr>`).join('')}</tbody></table></div>`;
+      const pr = PROP_ROWS.filter(r => r[2] !== 'li' || !dash(v.li)).map(r => [r[0], r[1], v[r[2]]]).concat(s.extraProps || []);
+      h += `<div><h3>물성 · 운전값</h3><table class="tbl"><tbody>${pr.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${dash(r[2]) ? '–' : esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    if (s.rows) h += `<div><h3>Stream Table</h3><table class="tbl"><tbody>${s.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+    const ch = comp('성분 · Liquid (wt%)', s.comp) + comp('성분 · Solids (wt%)', s.compSolids);
+    h += ch || (s.v || s.rows ? `<div class="note"><p>${esc(s.compNote || '도면에 이 라인의 성분 값이 없습니다(전부 –).')}</p></div>` : '');
+    h += notes(s.note, s.flag || s.valueSrc === 'image');
+    if (s.sheet) h += `<div class="src">출처: ${esc(s.sheet)}</div>`;
+    h += chipsHTML(id); panel.innerHTML = h; wire();
+  }
+  function renderNode(id) {
+    const n = NI[id]; let h = `<div class="p-head"><div class="p-ko big">${esc(n.title)}</div>${n.tags ? `<div class="p-name">${esc(n.tags)}</div>` : ''}</div>`;
+    if (n.kpiStreams && n.kpiStreams.length) h += `<div class="kpis">${n.kpiStreams.filter(k => ST[k]).map(k => { const s = ST[k]; return `<div class="kpi c-${s.cat}"><div class="k">${esc(s.short || CATS[s.cat].label)} <button type="button" class="link" data-s="${esc(k)}">${esc(lab(k))}</button></div><div class="v">${dash(s.v && s.v.nm) ? '–' : esc(s.v.nm)}<small>t/h</small></div></div>`; }).join('')}</div>`;
+    if (n.compare) { const C = n.compare; h += `<div><h3>${esc(C.title || '비교')}</h3><div class="tblwrap"><table class="tbl"><thead><tr><th></th><th></th>${C.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${C.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td>${r.slice(2).map(x => `<td class="num">${dash(x) ? '–' : esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${C.foot && C.foot.length ? `<div class="src" style="margin-top:6px">${C.foot.map(esc).join('<br>')}</div>` : ''}</div>`; }
+    h += notes(n.info);
+    if (n.links && n.links.length) h += `<div><h3>연결 Stream</h3><div class="chips">${n.links.filter(k => ST[k]).map(k => `<button type="button" class="c-${ST[k].cat}" data-s="${esc(k)}">${esc(ST[k].info ? (ST[k].ko || k) : lab(k))}</button>`).join('')}</div></div>`;
+    h += chipsHTML(null); panel.innerHTML = h; wire();
+  }
+  function wire() { panel.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => select(b.dataset.s))); }
+  function clearSel() { svg.querySelectorAll('.g-line.sel').forEach(g => g.classList.remove('sel')); }
+  function select(id) { if (!ST[id]) return; clearSel(); svg.classList.add('has-sel'); (groups[id] || groups[ST[id].drawnAs] || []).forEach(g => g.classList.add('sel')); renderStream(id); }
+  function selectNode(id) { clearSel(); const n = NI[id], ids = [...(n.links || []), ...(n.kpiStreams || [])]; if (ids.length) { svg.classList.add('has-sel'); ids.forEach(k => (groups[k] || []).forEach(g => g.classList.add('sel'))); } else svg.classList.remove('has-sel'); renderNode(id); }
+  const start = M.defaultSelect && ST[M.defaultSelect] ? M.defaultSelect : Object.keys(ST).find(k => !ST[k].info);
+  if (start) select(start); else { panel.innerHTML = chipsHTML(null); wire(); }
+}
+function showResult(D, fromSaved) {
+  $('#result').hidden = false; renderViewer(D);
+  $('#r-status').textContent = fromSaved ? '저장된 흐름도를 열었습니다. Claude를 부르지 않았습니다.' : (D.meta.generated ? `생성: ${new Date(D.meta.generated.at).toLocaleString('ko-KR')} · Claude ${D.meta.generated.calls}회` : '');
+  $('#r-save').disabled = !DB; $('#result').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+/* =====================================================================
+   8. Save / open (db = private per viewer; JSON download/open as fallback)
+   ===================================================================== */
+let DB = null, UID = null;
+async function initStore() {
+  try {
+    if (!window.claude) throw 0;
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) throw 0; UID = await user.id(); if (!UID) throw 0; DB = db;
+    await refreshSaved();
+  } catch (e) { DB = null; $('#saved-list').innerHTML = '<li class="muted">이 화면에서는 저장 목록을 쓸 수 없습니다. JSON 파일로 내려받아 다시 열 수 있습니다.</li>'; }
+}
+async function refreshSaved() {
+  if (!DB) return;
+  try {
+    const q = await DB.collection('data/users/' + UID).orderBy('createdAt', 'desc').limit(30).get();
+    const docs = q.docs.filter(d => (d.data() || {}).kind === 'flow');
+    $('#saved-list').innerHTML = docs.length ? docs.map(d => { const x = d.data(); return `<li><span><span class="t">${esc(x.title)}</span><br><span class="muted">${new Date(x.createdAt).toLocaleString('ko-KR')} · ${esc(x.files || '')}</span></span><span class="row" style="flex-wrap:nowrap"><button type="button" class="link" data-open="${esc(d.id)}">열기</button><button type="button" class="link" data-del="${esc(d.id)}">삭제</button></span></li>`; }).join('')
+      : '<li class="muted">아직 저장한 흐름도가 없습니다. 생성한 뒤 "저장"을 누르면 여기에 남습니다.</li>';
+    $('#saved-list').querySelectorAll('[data-open]').forEach(b => b.onclick = async () => { const s = await DB.collection('data/users/' + UID).doc(b.dataset.open).get(); if (s.exists) { S.result = JSON.parse(s.data().data); showResult(S.result, true); } });
+    $('#saved-list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      if (b.dataset.armed) { await DB.collection('data/users/' + UID).doc(b.dataset.del).delete(); refreshSaved(); }
+      else { b.dataset.armed = '1'; b.textContent = '정말 삭제'; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = '삭제'; } }, 4000); } });
+  } catch (e) { $('#saved-list').innerHTML = '<li class="muted">저장 목록을 불러오지 못했습니다.</li>'; }
+}
+async function saveResult() {
+  if (!DB || !S.result) return;
+  const body = JSON.stringify(S.result);
+  if (body.length > 240000) { $('#r-status').textContent = '흐름도가 너무 커서 저장 목록에 넣지 못했습니다. JSON으로 내려받아 주세요.'; return; }
+  try {
+    await DB.collection('data/users/' + UID).doc('flow-' + Date.now()).set({kind: 'flow', title: S.result.meta.title || '흐름도', createdAt: Date.now(), files: (S.result.meta.sheets || []).map(x => x.file).filter((v, i, a) => a.indexOf(v) === i).join(', ').slice(0, 200), data: body});
+    $('#r-status').textContent = '저장했습니다. 다시 열 때는 Claude를 부르지 않습니다.'; refreshSaved();
+  } catch (e) { $('#r-status').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : '') + '. JSON으로 내려받아 주세요.'; }
+}
+async function downloadResult() {
+  if (!S.result) return;
+  const dl = window.claude ? await window.claude.use('downloads') : null;
+  const name = (S.result.meta.title || 'pfd-flow').replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  if (!dl) { $('#r-status').textContent = '이 화면에서는 파일 내려받기를 쓸 수 없습니다.'; return; }
+  try { await dl.save({filename: name, data: JSON.stringify(S.result, null, 1)}); } catch (e) { if (e && e.code !== 'declined') $('#r-status').textContent = '내려받지 못했습니다.'; }
+}
+function openJson(file) {
+  file.text().then(t => { const D = JSON.parse(t); if (!D.streams || !(D.nodes || D.lines)) throw new Error('흐름도 데이터가 아닙니다'); S.result = D; showResult(D, true); })
+    .catch(e => say('JSON을 열지 못했습니다: ' + (e.message || e), 'bad'));
+}
+
+/* =====================================================================
+   9. Wiring
+   ===================================================================== */
+$('#pick').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+const drop = $('#drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); addFiles([...e.dataTransfer.files]); });
+$('#system').addEventListener('input', updateGen);
+$('#system').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#gen').disabled) generate(); });
+$('#gen').onclick = generate;
+$('#stop').onclick = () => S.ctl && S.ctl.abort();
+$('#open-json').onclick = () => $('#json-file').click();
+$('#json-file').onchange = e => { if (e.target.files[0]) openJson(e.target.files[0]); e.target.value = ''; };
+$('#demo').onclick = () => { S.result = JSON.parse($('#demo-data').textContent); showResult(S.result, true); $('#r-status').textContent = '예시(가상 데이터)입니다.'; };
+$('#r-new').onclick = () => { $('#result').hidden = true; window.scrollTo({top: 0, behavior: 'smooth'}); };
+$('#r-save').onclick = saveResult;
+$('#r-dl').onclick = downloadResult;
+renderSteps(); initStore();
+</script>
