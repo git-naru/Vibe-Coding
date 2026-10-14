@@ -1,6 +1,6 @@
 # 인수인계 — PFD 공정 실적·투자비 산출
 
-작성 2026-10-14 · 기준 `main` = PR #5 머지(`d95e704`) 이후
+작성 2026-10-14 · 기준 `main` = PR #8 머지(`eb6a681`) 이후
 
 이 문서는 로컬에서 새 프로젝트를 구성하고 작업을 이어 가기 위한 인수인계입니다. 요구사항과 결정 이력은 PRD에, 데이터 형식은 `.claude/skills/pfd-flow-viewer/references/data-schema.md`에 있습니다.
 
@@ -24,7 +24,7 @@ PFD(Mass Balance 포함)를 읽어 공정 흐름도와 Equipment List를 만들�
 | 비공개 앱 (실데이터 예시 포함) | https://claude.ai/artifact/EiW5GCr21ZyWsHP9thBbYd | 소유자만 열람 |
 | PRD | https://claude.ai/code/artifact/803d79e1-ce3f-42f1-be0b-d8cceaa6ad81 | |
 
-병합 이력: #1 스킬·HTML 앱·Equipment List·CI → #2 메인 흐름 탭·구역별 줄 배치·비공개 샘플 슬롯 → #3 실적/투자비 2분할·프로젝트 기록·상세설명 프레임·패키지 보기·설비비 매칭 → #4 투자비 산출 → #5 도면 번호 없는 시트 찾기 수정.
+병합 이력: #1 스킬·HTML 앱·Equipment List·CI → #2 메인 흐름 탭·구역별 줄 배치·비공개 샘플 슬롯 → #3 실적/투자비 2분할·프로젝트 기록·상세설명 프레임·패키지 보기·설비비 매칭 → #4 투자비 산출 → #5 도면 번호 없는 시트 찾기 수정 → #6 인수인계 문서(HANDOVER.md·CLAUDE.md) → #7 로컬 `.venv`·`dist/` 무시(.gitignore) → #8 20MB 넘는 파일을 막지 않고 경고.
 
 ## 3. 저장소 구조
 
