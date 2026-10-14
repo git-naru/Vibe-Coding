@@ -528,7 +528,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <span class="lab" id="v-mode-lab">흐름 보기</span>
         <div class="seg" id="v-mode" role="group" aria-labelledby="v-mode-lab"><button type="button" data-m="pkg" aria-pressed="true">패키지별</button><button type="button" data-m="eq" aria-pressed="false">설비별</button></div>
         <span class="muted" id="v-mode-st" aria-live="polite"></span>
-        <label class="lab" id="util-lab" hidden><input type="checkbox" id="util-show"> 유틸리티 라인 보기</label>
+        <label class="lab" id="util-lab" hidden><input type="checkbox" id="util-show"> 모든 라인 보기</label>
         <button type="button" id="pkg-make" hidden title="지금 패키지를 버리고 공정 구역(Area: 3200-PU-001의 3200, 330T01의 330)마다 패키지 하나로 다시 묶습니다">패키지 재설정</button>
       </div>
       <div class="main">
@@ -1629,7 +1629,7 @@ const FLOW_ROWS = [['Balance · 일 합계', 'dm', 'dv', 't/d', 'm³/d'], ['Nomi
 const PROP_ROWS = [['Density', 't/m³', 'rho'], ['Temperature', '°C', 'T'], ['Pressure (abs)', 'bar', 'P'], ['% Solids', '%', 'sol'], ['% Liquid', '%', 'liq'], ['Li⁺', 'ppm', 'li'], ['pH', '—', 'pH'], ['Design Factor', '—', 'DF'], ['Run Time', 'h/d', 'RT']];
 const KPI_DEFAULT = [['Nominal 질량유량', 'nm', 't/h'], ['Design 질량유량', 'dsm', 't/h'], ['온도', 'T', '°C'], ['압력', 'P', 'bar(a)']];
 const NS = 'http://www.w3.org/2000/svg';
-let V = null; // current viewer data (a package view, or a main stream without its utility lines, carries its source flow in .base)
+let V = null; // current viewer data (a package view, or a main stream trimmed to its main lines, carries its source flow in .base)
 const VSEL = {};   // selection functions of the current viewer
 function renderViewer(D) {
   V = D; const M = D.meta || {}, CATS = D.categories || {}, ST = D.streams || {}, NI = nodeInfoOf(D);
@@ -1820,21 +1820,27 @@ function packageView(D) {
   layout(Dp); Dp.base = D.base || D;
   PKV.set(D, Dp); return Dp;
 }
-/* The main stream tab leaves out utility lines — air, N2, steam, condensate, cooling/chilled water, fuel gas — and the
-   boxes only they reach, in both views; raw materials and reagents stay. Utility tabs (스팀·응축수 …) show everything.
-   Derived on the fly: the flow itself keeps every line, and "유틸리티 라인 보기" brings them back. */
+/* The main stream tab shows only the main stream (raw material → product, recycles) and the 부원료 (reagents) going
+   into it, in both views; every other line — discards, utilities (air, N2, steam, condensate, cooling water, fuel gas),
+   anything uncategorised — is left out with the boxes only those lines reach. Kept: categories main / product / recycle /
+   reagent (the keys the main stream prompt asks for), or a category label that says so, unless the line reads as a
+   utility. System tabs (스팀·응축수 …) show everything, and so does a flow none of whose lines qualifies.
+   Derived on the fly: the flow itself keeps every line, and "모든 라인 보기" brings them back. */
+const SHOW_CAT = /^(main|feed|raw|process|product|recycle|reagent)/i, SHOW_LABEL = /메인|주\s*공정|원료|제품|재순환|모액|여액|시약|부원료|약품|첨가|main|feed|product|recycle|reagent|chemical/i;
 const UTIL_RX = /\b(?:INSTRUMENT\s+|PLANT\s+|SERVICE\s+|COMPRESSED\s+)?AIR\b|\bN\s*[2₂]\b|NITROGEN|\bSTEAM\b|CONDENSATE|COOLING\s+WATER|CHILLED\s+WATER|\bC\.?W\.?[SR]\b|FUEL\s*GAS|\bLPG\b|공기|질소|증기|스팀|응축수|냉각수|냉수|칠러|연료\s*가스/i;
-function utilityStreams(D) {   // empty when utilities are half the flow or more: then the flow is itself a utility system
+function hiddenStreams(D) {
   const C = D.categories || {}, all = Object.entries(D.streams || {}).filter(([, x]) => !x.info);
-  const U = new Set(all.filter(([, x]) => UTIL_RX.test([x.ko, x.en, (C[x.cat] || {}).label].join(' '))).map(([k]) => k));
-  return U.size * 2 >= all.length ? new Set() : U;
+  const shown = ([, x]) => { const lab = (C[x.cat] || {}).label || '';
+    return (SHOW_CAT.test(x.cat || '') || SHOW_LABEL.test(lab)) && !UTIL_RX.test([x.ko, x.en, lab].join(' ')); };
+  const keep = all.filter(shown);
+  return keep.length ? new Set(all.filter(e => !shown(e)).map(([k]) => k)) : new Set();
 }
 const isMainTab = () => { const B = S.bundle, t = B && B.tabs[B.active || 0]; return !!((t && t.main) || (S.result && (S.result.meta || {}).main)); };
 function shownFlow(D) {
   if (S.showUtil || !isMainTab()) return D;
-  const U = utilityStreams(D); if (!U.size) return D;
+  const U = hiddenStreams(D); if (!U.size) return D;
   const all = linksOf(D), keep = all.filter(l => !U.has(l.id)), live = new Set(keep.flatMap(l => [l.from, l.to])), had = new Set(all.flatMap(l => [l.from, l.to]));
-  const gone = id => had.has(id) && !live.has(id);   // reached only by utility lines
+  const gone = id => had.has(id) && !live.has(id);   // reached only by hidden lines
   const ni = {}; for (const [k, v] of Object.entries(nodeInfoOf(D))) if (!gone(k)) ni[k] = {...v, links: (v.links || []).filter(x => !U.has(x))};
   const streams = Object.fromEntries(Object.entries(D.streams).filter(([k]) => !U.has(k))), lines = (D.lines || []).filter(l => !U.has(l.s));
   const used = new Set([...lines.map(l => l.cat || (D.streams[l.s] || {}).cat), ...Object.values(streams).map(x => x.cat)]);
@@ -1859,8 +1865,8 @@ function updateViewBar() {
   const eq = (D.nodes || []).filter(isEquipNode), ids = new Set(eq.map(n => n.id)), packed = has ? new Set(D.packages.flatMap(p => p.members).filter(m => ids.has(m))).size : 0;
   $('#v-mode-st').textContent = !has ? `설비 ${eq.length}개 · 아직 패키지로 묶지 않았습니다` : `패키지 ${D.packages.length}개 · 설비 ${eq.length}개 중 ${packed}개 묶음${eq.length - packed ? ` · 패키지 밖 ${eq.length - packed}개` : ''}`;
   $('#pkg-make').hidden = false; $('#pkg-make').disabled = busy();
-  const nu = isMainTab() ? utilityStreams(D).size : 0; $('#util-lab').hidden = !nu; $('#util-show').checked = !!S.showUtil;
-  if (nu && !S.showUtil) $('#v-mode-st').textContent += ` · 유틸리티 라인 ${nu}개 숨김`;
+  const nu = isMainTab() ? hiddenStreams(D).size : 0; $('#util-lab').hidden = !nu; $('#util-show').checked = !!S.showUtil;
+  if (nu && !S.showUtil) $('#v-mode-st').textContent += ` · 메인 흐름·부원료 외 라인 ${nu}개 숨김`;
 }
 async function openEquip(id) {   // from a package card: the equipment view, that equipment selected
   S.viewMode = 'eq'; await showView();
