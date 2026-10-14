@@ -197,6 +197,14 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .eqt .st-unk{color:var(--warn);font-weight:600}
 .eqt .st-sb{color:var(--muted)}
 .eqt .flag{color:var(--warn)}
+.eqt td.cost{cursor:text;font-family:var(--f-mono);font-size:12px;text-align:right}
+.eqt td.cost:hover{outline:1px dashed var(--focus);outline-offset:-3px}
+.eqt td.how{font-size:11.5px;color:var(--muted)}
+.eqt td.how.chk{color:var(--warn)}
+.costbox{border:1px solid var(--rule);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--paper)}
+.costhead{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between}
+.costhead h3{margin:0}
+.costhead input{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--panel);color:var(--ink);width:120px;flex:none}
 .pfdview{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 .pfdview .box{background:var(--panel);border-radius:8px;width:min(1400px,100%);height:min(92vh,100%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--rule)}
 .pfdview .bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--rule)}
@@ -360,7 +368,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="cols" id="setup-cols">
     <section class="card" id="setup" aria-label="공정 데이터 입력">
       <h2>공정 데이터 입력</h2>
-      <p class="muted" style="margin:0">PFD(Mass Balance 포함), P&amp;ID, Mass Balance 엑셀·문서를 올리면 공정 흐름도와 Equipment List를 만들고, 이 프로젝트의 실적 기록으로 저장합니다.</p>
+      <p class="muted" style="margin:0">PFD(Mass Balance 포함), P&amp;ID, Mass Balance 엑셀·문서를 올리면 공정 흐름도와 Equipment List를 만들고, 이 프로젝트의 실적 기록으로 저장합니다. 설비비가 적힌 수동 Equipment List(Excel·CSV)를 함께 올리면 PFD 설비와 매칭해 설비별 설비비를 붙입니다.</p>
       <div class="drop" id="drop">
         <button type="button" class="primary" id="pick">파일 선택</button>
         <input type="file" id="file" multiple accept=".pdf,.xlsx,.docx" hidden>
@@ -406,12 +414,22 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
           <input type="search" id="eq-q" placeholder="Tag·이름 찾기" aria-label="Equipment List에서 찾기">
           <button type="button" id="eq-vis" disabled title="글자 없이 그림으로만 그려진 설비를 Claude가 도면 이미지로 찾습니다. 시트당 Claude 1회">그림으로 설비 찾기</button>
           <button type="button" id="eq-vis-stop" hidden>중지</button>
-          <button type="button" class="primary" id="eq-xlsx" disabled>Excel로 내려받기</button>
+          <button type="button" id="eq-cost" title="사람이 관리하는 Equipment List(설비비 포함 Excel·CSV)를 PFD 설비와 매칭합니다">설비비 목록 올리기</button>
+        <input type="file" id="cost-file" accept=".xlsx,.xls,.csv" hidden>
+        <button type="button" class="primary" id="eq-xlsx" disabled>Excel로 내려받기</button>
         </div>
       </div>
       <div class="eqcounts" id="eq-counts"></div>
+    <section class="costbox" id="cost" hidden aria-label="설비비 매칭">
+      <div class="costhead"><h3>설비비 매칭 · PFD Equipment List ↔ 수동 Equipment List</h3>
+        <span class="row"><label class="lab" for="cost-unit">금액 단위</label><input type="text" id="cost-unit" placeholder="예: USD, 백만원" autocomplete="off"><button type="button" id="cost-ai" hidden title="Tag·이름으로 맞지 않은 항목을 Claude가 PFD 설비와 짝짓습니다. Claude 1회">Claude로 남은 항목 매칭</button><button type="button" id="cost-clear" hidden>설비비 목록 빼기</button></span></div>
+      <p class="muted" id="cost-src" style="margin:0"></p>
+      <div class="summary" id="cost-sum"></div>
+      <details id="cost-un" hidden><summary id="cost-un-sum"></summary><div class="tblwrap" style="margin-top:8px;max-height:320px;overflow:auto"><table class="tbl" id="cost-un-tbl"></table></div><datalist id="cost-dl"></datalist></details>
+      <div class="muted" id="cost-msg" aria-live="polite"></div><div class="muted" id="cost-save"></div>
+    </section>
       <div class="eqwrap" id="eq-wrap" tabindex="-1"><table class="eqt" id="eq-tbl"></table></div>
-      <p class="muted" style="margin:0">행을 두 번 누르거나(키보드는 Enter) 하면 그 설비가 있는 PFD를 새 창으로 열고 위치를 빨간 상자로 표시합니다. 노란 행은 Tag 없이 그려진 설비 후보(미확인)입니다. "그림으로 설비 찾기"는 글자 없이 기호로만 그려진 설비를 Claude가 도면 이미지로 찾아 미확인 후보에 더합니다(시트당 1회). 도면 구역은 도면 테두리 격자(행 A–G, 열 1–10)입니다.</p>
+      <p class="muted" style="margin:0">행을 두 번 누르거나(키보드는 Enter) 하면 그 설비가 있는 PFD를 새 창으로 열고 위치를 빨간 상자로 표시합니다. 노란 행은 Tag 없이 그려진 설비 후보(미확인)입니다. "그림으로 설비 찾기"는 글자 없이 기호로만 그려진 설비를 Claude가 도면 이미지로 찾아 미확인 후보에 더합니다(시트당 1회). 도면 구역은 도면 테두리 격자(행 A–G, 열 1–10)입니다. 설비비 칸을 누르면 금액을 직접 입력할 수 있고(비우면 매칭 금액으로 돌아감), "설비비 목록 올리기"로 수동 Equipment List를 올리면 Tag → 이름 순으로 자동 매칭합니다.</p>
     </section>
 
     <section id="result" hidden aria-label="흐름도">
@@ -782,7 +800,9 @@ async function readXlsx(entry) {
   const wb = XLSX.read(await entry.file.arrayBuffer(), {type: 'array'});
   const t = parseXlsxTables(wb); t.forEach(x => x.file = entry.file.name);
   S.xlsxTables.push(...t); entry.pages = wb.SheetNames.length;
-  entry.note = t.length ? `Stream 표 ${t.length}개` : 'Stream 표를 찾지 못함';
+  const cl = t.length ? null : parseCostWorkbook(wb);   // not a stream table: maybe the manual equipment list with costs
+  if (cl) entry.costList = cl;
+  entry.note = t.length ? `Stream 표 ${t.length}개` : cl ? `설비비 목록 ${cl.items.length}행 → Equipment List와 매칭` : 'Stream 표를 찾지 못함';
 }
 async function readDocx(entry) {
   await loadScript(CDN.mammoth);
@@ -821,6 +841,7 @@ async function addFiles(list) {
   S.docText = S.files.filter(e => e.text).map(e => `# ${e.file.name}\n${e.text}`).join('\n\n').slice(0, 20000);
   renderLocal();
   if (EQ.state === 'run') finishEquipment();
+  S.files.filter(e => e.costList && !e.costLoaded).forEach(e => { e.costLoaded = true; loadCostList(e.costList, e.file.name); });
 }
 function finishEquipment() {
   eqProgress(97, '설비 목록 정리 중…');
@@ -1587,6 +1608,8 @@ function renderViewer(D) {
     const n = NI[id], d = (DESC.nodes || {})[id];
     let h = `<button type="button" class="dc-head"><span class="dc-t">${esc(n.title)}</span>${n.tags ? `<span class="dc-tag">${esc(n.tags)}</span>` : ''}</button>`;
     h += descP(d);
+    const cst = EQ.costCalc && costOfNodes(n.members ? n.members.map(m => ({id: m.id, sub: m.tag})) : [{id, sub: n.tags}]);
+    if (cst) h += `<div class="kpis"><div class="kpi"><div class="k">${n.pkg ? '패키지 설비비 합계' : '설비비'}</div><div class="v">${cst.n ? fmtCost(cst.sum) : '–'}${EQ.cost.unit ? `<small>${esc(EQ.cost.unit)}</small>` : ''}</div></div><div class="kpi"><div class="k">금액 있는 설비</div><div class="v">${cst.n} / ${cst.of}</div></div></div>`;
     if (n.kpiStreams && n.kpiStreams.length) h += `<div class="kpis">${n.kpiStreams.filter(k => ST[k]).map(k => { const s = ST[k]; return `<div class="kpi c-${s.cat}"><div class="k">${esc(s.short || CATS[s.cat].label)} <button type="button" class="link" data-s="${esc(k)}">${esc(lab(k))}</button></div><div class="v">${dash(s.v && s.v.nm) ? '–' : esc(s.v.nm)}<small>t/h</small></div></div>`; }).join('')}</div>`;
     h += notes((n.info || []).filter(t => t !== d));
     if (n.links && n.links.length) h += `<div><h3>${n.pkg ? '패키지 입출구 Stream' : '연결 Stream'}</h3><div class="chips">${n.links.map(chip).join('')}</div></div>`;
@@ -1830,7 +1853,7 @@ function leaveWork() {
 }
 function resetWork() {
   Object.assign(S, {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, recordId: null});
-  Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}});
+  Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}, cost: null, costCalc: null, costSig: ''}); $('#cost-msg').textContent = ''; $('#cost-save').textContent = '';
   $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
   Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
@@ -1879,7 +1902,7 @@ async function syncProject() {   // record count and the largest equipment list 
 async function saveRecord() {
   if (!S.project || !S.bundle) return false;
   const E = EQ.rows.length ? {rows: EQ.rows, refsMissing: EQ.refsMissing, areaNames: EQ.areaNames || {},
-    file: EQ.sample ? EQ.sample.file : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => e.file.name).join(', '), sheets: EQ.sample ? EQ.sample.sheets : S.sheets.length} : null;
+    file: EQ.sample ? EQ.sample.file : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => e.file.name).join(', '), sheets: EQ.sample ? EQ.sample.sheets : S.sheets.length, cost: EQ.cost || null} : null;
   const payload = JSON.stringify({bundle: S.bundle, equipment: E}), n = Math.ceil(payload.length / PART), now = Date.now();
   const id = S.recordId || 'rec-' + now.toString(36);
   try {
@@ -1902,7 +1925,7 @@ async function openRecord(id) {
     const X = JSON.parse(body);
     resetWork(); S.recordId = id;
     const E = X.equipment;
-    if (E && E.rows) { Object.assign(EQ, {rows: E.rows, refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label: '저장된 기록', file: E.file, sheets: E.sheets}, state: 'done'}); $('#eq').hidden = false; eqProgress(100, `저장된 기록 · 설비 ${E.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done'); }
+    if (E && E.rows) { Object.assign(EQ, {rows: E.rows, refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label: '저장된 기록', file: E.file, sheets: E.sheets}, state: 'done', cost: E.cost || null, costSig: ''}); $('#eq').hidden = false; eqProgress(100, `저장된 기록 · 설비 ${E.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done'); }
     await showBundle(X.bundle, true); renderEquipment(); loadRecords();
     $('#r-status').textContent = `기록 "${r.title}"을 열었습니다 (${stamp(r.updatedAt || r.createdAt)}). Claude를 부르지 않았습니다.`;
   } catch (e) { say('기록을 열지 못했습니다: ' + (e.message || e.code || e), 'bad'); }
@@ -2249,12 +2272,15 @@ function renderEquipment() {
     ['확인 필요', EQ.rows.filter(r => rowFlags(r) && !r.untagged).length], ['도면 미포함 참조', EQ.refsMissing.length]]
     .map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('') + (EQ.mbTitle ? `<span>물질수지 값: <b>${esc(EQ.mbTitle)}</b> 탭에서 ${EQ.rows.filter(r => r.mb).length}건</span>` : '') + (q ? `<span>찾은 행 <b>${rows.length}</b></span>` : '') : '';
   const mb = EQ.rows.some(r => r.mb);
-  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
+  const sig = EQ.rows.length + '|' + (EQ.cost ? JSON.stringify([EQ.cost.edits, EQ.cost.pick, EQ.cost.ai, EQ.cost.list && EQ.cost.list.items.length]) : '');
+  if (sig !== EQ.costSig) { EQ.costSig = sig; EQ.costCalc = EQ.cost ? computeCosts() : null; renderCostPanel(); }
+  const K = EQ.costCalc, cu = EQ.cost && EQ.cost.unit ? ` (${esc(EQ.cost.unit)})` : '', hasList = !!(EQ.cost && EQ.cost.list);
+  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', `설비비${cu}`, ...(hasList ? ['매칭'] : []), 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
   const stCls = s => s === '미확인' ? 'st-unk' : s.startsWith('예비') || s.startsWith('향후') ? 'st-sb' : '';
   $('#eq-tbl').innerHTML = `<thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => {
     const i = EQ.rows.indexOf(r);
     return `<tr tabindex="0" data-i="${i}" class="${r.untagged ? 'unk' : ''}" title="두 번 누르면 PFD를 엽니다"><td class="mono r">${i + 1}</td><td class="mono">${esc(r.tag)}</td><td title="${esc(r.name)}">${esc(r.name)}</td><td>${esc(r.kind)}</td>
-      <td class="${stCls(r.status)}">${esc(r.status)}</td><td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>
+      <td class="${stCls(r.status)}">${esc(r.status)}</td>${(() => { const b = K && K.byKey[eqKey(r)]; return `<td class="cost" data-k="${esc(eqKey(r))}" title="눌러서 설비비 입력${b && b.split ? ` · 목록 1행을 ${b.split}기에 나눔` : ''}">${b ? fmtCost(b.cost) : '–'}</td>${hasList ? `<td class="how${b && (b.how === 'name' || b.how === 'ai') ? ' chk' : ''}">${b ? esc(HOW[b.how] || '') : ''}</td>` : ''}`; })()}<td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>
       ${mb ? `<td class="mono">${esc(r.mb ? r.mb.basis : '')}</td><td class="mono r">${r.mb && r.mb.dx !== '' ? fmt(+r.mb.dx) : ''}</td><td class="mono r">${esc(r.mb ? r.mb.T : '')}</td><td class="mono r">${esc(r.mb ? r.mb.P : '')}</td>` : ''}
       <td class="flag" title="${esc(rowFlags(r))}">${esc(rowFlags(r))}</td></tr>`; }).join('') || `<tr><td colspan="${head.length}" class="muted">${EQ.state === 'run' ? '읽는 중…' : '설비를 찾지 못했습니다.'}</td></tr>`}</tbody>`;
   $('#eq-xlsx').disabled = !EQ.rows.length || EQ.state === 'run';
@@ -2263,9 +2289,9 @@ function renderEquipment() {
   $('#eq-vis').textContent = !EQ.rows.length || left === S.sheets.length ? '그림으로 설비 찾기' : left ? `그림으로 설비 찾기 (남은 ${left}장)` : '그림 대조 완료';
   if (EQ.rows.length && !left) $('#eq-vis').disabled = true;
 }
-$('#eq-tbl').addEventListener('dblclick', e => { const tr = e.target.closest('tr[data-i]'); if (tr) openPfd(EQ.rows[+tr.dataset.i]); });
+$('#eq-tbl').addEventListener('dblclick', e => { if (e.target.closest('td.cost')) return; const tr = e.target.closest('tr[data-i]'); if (tr) openPfd(EQ.rows[+tr.dataset.i]); });
 $('#eq-tbl').addEventListener('keydown', e => {
-  const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+  const tr = e.target.closest('tr[data-i]'); if (!tr || e.target.tagName === 'INPUT') return;
   if (e.key === 'Enter') { e.preventDefault(); openPfd(EQ.rows[+tr.dataset.i]); }
   else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling; if (n) n.focus(); }
 });
@@ -2413,9 +2439,11 @@ async function downloadEquipment() {
   if (!EQ.rows.length) return;
   await loadScript(CDN.xlsx);
   const mb = EQ.rows.some(r => r.mb);
-  const head = ['No.', 'Area', 'Tag No.', 'Equipment Name (도면 원문)', '종류', '운전 구분', '비고 (도면 표기)', 'Nom. Vol. (m³)', 'PFD 도면 번호', 'PDF 파일', 'PDF 쪽', '도면 구역 (행-열)',
+  const K = EQ.costCalc, C = EQ.cost, cu = C && C.unit ? ` (${C.unit})` : '', listRows = it => (it || []).map(i => C.list && C.list.items[i] ? C.list.items[i].row : '').join(', ');
+  const costCols = r => { if (!K) return []; const b = K.byKey[eqKey(r)]; return b ? [Math.round(b.cost * 100) / 100, HOW[b.how] + (b.split ? ` (1행을 ${b.split}기에 나눔)` : ''), listRows(b.items)] : ['', '', '']; };
+  const head = ['No.', 'Area', 'Tag No.', 'Equipment Name (도면 원문)', '종류', '운전 구분', ...(K ? [`설비비${cu}`, '설비비 매칭', '설비비 목록 행'] : []), '비고 (도면 표기)', 'Nom. Vol. (m³)', 'PFD 도면 번호', 'PDF 파일', 'PDF 쪽', '도면 구역 (행-열)',
     ...(mb ? ['값 출처 탭', '입구 Stream', '출구 Stream', '기준 Stream', '유체', '일 유량 (t/d)', 'Nominal 평균 (t/h)', 'Design 최대 (t/h)', '운전 온도 (°C)', '운전 압력 (bar)', '밀도 (t/m³)', '고형분 (%)'] : []), '확인 필요'];
-  const aoa = [head, ...EQ.rows.map((r, i) => [i + 1, r.area, r.tag, r.name, r.kind, r.status, r.note, r.vol, r.dwg, r.file, r.page, r.zone,
+  const aoa = [head, ...EQ.rows.map((r, i) => [i + 1, r.area, r.tag, r.name, r.kind, r.status, ...costCols(r), r.note, r.vol, r.dwg, r.file, r.page, r.zone,
     ...(mb ? (r.mb ? [r.mb.tab, r.mb.in, r.mb.out, r.mb.basis, r.mb.fluid, r.mb.dm, r.mb.nm, r.mb.dx, r.mb.T, r.mb.P, r.mb.rho, r.mb.sol] : Array(12).fill('')) : []), rowFlags(r)])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = head.map(h => ({wch: /Name/.test(h) ? 44 : /도면 번호|확인/.test(h) ? 32 : /파일|유체/.test(h) ? 22 : Math.max(8, Math.min(16, h.length + 2))}));
@@ -2424,16 +2452,23 @@ async function downloadEquipment() {
   // summary by area × kind (values; the list sheet is the source)
   const kinds = Object.entries(EQ.rows.reduce((m, r) => (m[r.kind] = (m[r.kind] || 0) + 1, m), {})).sort((a, b) => b[1] - a[1]).slice(0, 9).map(x => x[0]);
   const areas = [...new Set(EQ.rows.map(r => r.area))].sort();
-  const sum = [['Area', 'Area 이름', '전체', ...kinds, '기타', '운전', '예비', '향후', '미확인 (Tag 없음)']];
+  const sum = [['Area', 'Area 이름', '전체', ...kinds, '기타', '운전', '예비', '향후', '미확인 (Tag 없음)', ...(K ? [`설비비 합계${cu}`] : [])]];
   for (const a of areas) {
     const rs = EQ.rows.filter(r => r.area === a), k = kinds.map(x => rs.filter(r => r.kind === x).length);
     sum.push([a, EQ.areaNames[a] || '(입력에 이 Area 도면 없음)', rs.length, ...k, rs.length - k.reduce((p, q) => p + q, 0),
-      rs.filter(r => r.status === '운전').length, rs.filter(r => r.status.startsWith('예비')).length, rs.filter(r => r.status.startsWith('향후')).length, rs.filter(r => r.status === '미확인').length]);
+      rs.filter(r => r.status === '운전').length, rs.filter(r => r.status.startsWith('예비')).length, rs.filter(r => r.status.startsWith('향후')).length, rs.filter(r => r.status === '미확인').length,
+      ...(K ? [Math.round(rs.reduce((p, r) => p + ((K.byKey[eqKey(r)] || {}).cost || 0), 0) * 100) / 100] : [])]);
   }
   sum.push(['합계', '', ...sum[0].slice(2).map((_, j) => sum.slice(1).reduce((p, row) => p + row[j + 2], 0))]);
   const ws2 = XLSX.utils.aoa_to_sheet(sum); ws2['!cols'] = sum[0].map((_, j) => ({wch: j === 1 ? 44 : 10})); XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
   const ws3 = XLSX.utils.aoa_to_sheet([['Tag No.', '언급된 시트', '판단'], ...EQ.refsMissing.map(x => [x.tag, x.sheets, x.why])]);
   ws3['!cols'] = [{wch: 15}, {wch: 40}, {wch: 70}]; XLSX.utils.book_append_sheet(wb, ws3, '도면 미포함 설비');
+  if (K && C.list) {   // the manual list, row by row, with the PFD equipment each row went to
+    const cm = [['목록 행', 'Tag (원문)', '설비명', '수량', `금액${cu}`, '매칭된 PFD Tag', '매칭 방법'], ...C.list.items.map(it => { const ks = K.assign[it.i] || [];
+      return [it.row, it.tagRaw, it.name, it.qty ?? '', it.cost ?? '', ks.map(keyLabel).join(', '), ks.length ? HOW[K.how[it.i]] || '' : 'PFD에 없음']; }),
+      [], ['수동 목록 합계', '', '', '', Math.round(K.total * 100) / 100], ['PFD 설비에 매칭', '', '', '', Math.round((K.total - K.outside) * 100) / 100], ['PFD에 없음', '', '', '', Math.round(K.outside * 100) / 100]];
+    const wsc = XLSX.utils.aoa_to_sheet(cm); wsc['!cols'] = [{wch: 8}, {wch: 26}, {wch: 44}, {wch: 7}, {wch: 16}, {wch: 34}, {wch: 18}]; XLSX.utils.book_append_sheet(wb, wsc, '설비비 매칭');
+  }
   const basis = [['항목', '기준'],
     ['입력', EQ.sample ? `${EQ.sample.label || '실적 샘플'}: ${EQ.sample.file} (${EQ.sample.sheets}장)` : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
     ['설비 판별', '설비 이름 아래에 단독으로 적힌 Tag(NNNN-XX-NNN, 앞에 WF- 같은 접두가 붙을 수 있음)를 설비로 본다. 괄호·FROM/TO 문구·주석 속 Tag는 다른 시트 설비를 가리키는 참조라 "도면 미포함 설비" 탭에서 따로 본다.'],
@@ -2442,6 +2477,7 @@ async function downloadEquipment() {
     ['도면 구역', '도면 테두리 격자(위쪽 열 번호, 왼쪽 행 문자)로 Tag 글자(미확인은 이름 글자) 위치를 "행-열"로 적었다.'],
     ['미확인(Tag 없음)', '도면 글자에서 설비 이름만 있고 Tag가 없는 것을 찾은 후보다. 이름이 "(그림)"으로 시작하는 행은 "그림으로 설비 찾기"에서 Claude가 도면 이미지를 보고 찾은, 글자 없이 기호로만 그려진 설비 후보이며 확인 필요 열에 신뢰도를 적었다. 트럭·창고·피트·방류벽은 넣지 않았다.'],
     ['그림 대조', `${S.sheets.filter(sh => sh.eqVision).length}/${S.sheets.length}장 실행`],
+    ...(K ? [['설비비', `${C.list ? `수동 Equipment List ${C.list.file} (${C.list.sheet} 시트)를 Tag로 먼저 맞추고(번호 자릿수·범위 표기 001/002·001~003 정리), Tag가 없는 행은 이름이 비슷한 설비, 그다음 Claude 제안, 사람이 고른 매칭 순으로 붙였다. 목록 1행이 여러 기를 가리키면 금액을 기수로 나눴다. ` : ''}표에서 직접 입력한 금액은 "직접 입력"으로 표시했다. 단위: ${C.unit || '미지정'}.`]] : []),
     ['물질수지 값', mb ? `흐름도 탭(${EQ.mbTitle})의 Stream 값. 메인 흐름 탭을 먼저 보고, 없으면 다른 탭 값을 쓴다. 펌프·팬·압축기·보일러는 출구, 그 밖은 입구 Stream 기준이며 여러 개면 유량 합산, 온도·압력은 범위.` : '흐름도를 생성하거나 열면 그 계통 설비에 Stream 값이 채워진다.'],
     ['만든 때', new Date().toLocaleString('ko-KR')]];
   const ws4 = XLSX.utils.aoa_to_sheet(basis); ws4['!cols'] = [{wch: 18}, {wch: 110}]; XLSX.utils.book_append_sheet(wb, ws4, '작성 기준');
@@ -2457,6 +2493,223 @@ async function downloadEquipment() {
   a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 $('#eq-xlsx').onclick = downloadEquipment;
+
+/* =====================================================================
+   11. Equipment cost: the manually kept equipment list (with costs) matched to the PFD equipment list
+   Matching order: tag (ranges and zero padding normalised) → similar name → Claude suggestion; then the
+   viewer's own picks and typed costs override. Kept in EQ.cost and saved with the record.
+   ===================================================================== */
+const TAG_RE = /(?:\b([A-Z]{1,3})-)?(\d{4})-([A-Z]{2,4})-(\d{1,4})([A-Z]?)((?:\s*[\/~,&]\s*(?:\d{1,4}[A-Z]?|[A-Z])\b)*)/g;
+const pad3 = n => String(+n).padStart(3, '0');
+function normTag(t) {   // 3200-pu-1a → 3200-PU-001A (service prefix dropped)
+  const m = String(t || '').toUpperCase().replace(/\s+/g, '').match(/^(?:[A-Z]{1,3}-)?(\d{4})-([A-Z]{2,4})-(\d{1,4})([A-Z]?)$/);
+  return m ? `${m[1]}-${m[2]}-${pad3(m[3])}${m[4]}` : String(t || '').toUpperCase().trim();
+}
+function expandTags(text) {   // "3200-PU-001/002", "001~003", "001A/B", lists separated by , ; or new lines
+  const out = [];
+  for (const m of String(text || '').toUpperCase().matchAll(TAG_RE)) {
+    const [, , area, code, num, suf, tail] = m, base = n => `${area}-${code}-${pad3(n)}`;
+    let last = +num; out.push(base(num) + suf);
+    for (const t of (tail || '').matchAll(/([\/~,&])\s*(\d{1,4})?([A-Z]?)/g)) {
+      const [, op, n, s] = t;
+      if (n && op === '~') { for (let k = last + 1; k <= +n && k - last < 50; k++) out.push(base(k) + s); last = +n; }
+      else if (n) { out.push(base(n) + s); last = +n; }
+      else if (s) out.push(base(last) + s);
+    }
+  }
+  return [...new Set(out)];
+}
+const eqKey = r => r.untagged ? 'U:' + r.name + '@' + r.sheetKey : normTag(r.tag);
+const costNum = v => { if (typeof v === 'number') return Number.isFinite(v) ? v : null; const s = String(v || '').replace(/[^\d.\-]/g, ''); if (!s || s === '-' || s === '.') return null; const x = Number(s); return Number.isFinite(x) ? x : null; };
+const fmtCost = v => v == null ? '–' : v.toLocaleString('en-US', {maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0});
+/* ---- reading the list ---- */
+const COL_RX = {tag: /\btag\b|item\s*no|equip(ment)?\s*(no|number|tag)|기기\s*번호|설비\s*번호|태그/i, name: /desc|equipment\s*name|^name$|\bname\b|service|설비\s*명|품명|명칭|기기\s*명/i,
+  qty: /q'?ty|quantity|수량/i, unit: /unit\s*(price|cost|rate)|단가/i, amount: /amount|total|cost|price|금액|설비비|가격|합계|견적/i};
+function parseCostWorkbook(wb) {
+  let best = null;
+  for (const sn of wb.SheetNames) {
+    const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: true, defval: ''});
+    for (let h = 0; h < Math.min(40, A.length); h++) {
+      const row = A[h].map(c => String(c).trim()), cols = {};
+      row.forEach((c, j) => { if (!c) return;
+        if (cols.tag == null && COL_RX.tag.test(c)) cols.tag = j;
+        else if (cols.unit == null && COL_RX.unit.test(c)) cols.unit = j;
+        else if (cols.qty == null && COL_RX.qty.test(c)) cols.qty = j;
+        else if (cols.name == null && COL_RX.name.test(c)) cols.name = j;
+        else if (COL_RX.amount.test(c) && !COL_RX.unit.test(c)) cols.amount = j; });   // the last amount-like column is usually the total
+      if ((cols.tag == null && cols.name == null) || (cols.amount == null && cols.unit == null)) continue;
+      const items = [];
+      for (let r = h + 1; r < A.length; r++) {
+        const x = A[r], tagRaw = cols.tag != null ? String(x[cols.tag]).trim() : '', name = cols.name != null ? String(x[cols.name]).trim() : '';
+        if (!tagRaw && !name) continue;
+        if (/^(sub-?\s*total|total|합계|소계|계)$/i.test(name || tagRaw) || /합\s*계|소\s*계|sub-?total|grand\s*total/i.test(name)) continue;
+        const qty = cols.qty != null ? costNum(x[cols.qty]) : null, up = cols.unit != null ? costNum(x[cols.unit]) : null, am = cols.amount != null ? costNum(x[cols.amount]) : null;
+        const cost = am != null ? am : up != null ? up * (qty || 1) : null;
+        const tags = expandTags(tagRaw);
+        if (cost == null && !tags.length) continue;
+        items.push({i: items.length, row: r + 1, tagRaw, tags, name, qty, cost});
+      }
+      const head = cols.amount != null ? row[cols.amount] : row[cols.unit];
+      const unit = ((head.match(/\(([^)]+)\)/) || [])[1] || (head.match(/USD|KRW|EUR|JPY|CNY|백만원|천원|억원|원|\$/i) || [])[0] || '').trim();
+      const score = items.filter(it => it.cost != null).length * 2 + items.filter(it => it.tags.length).length;
+      if (items.length && (!best || score > best.score)) best = {sheet: sn, headerRow: h + 1, cols: Object.fromEntries(Object.entries(cols).map(([k, j]) => [k, row[j]])), unit, items, score};
+      break;   // first header-looking row of a sheet decides it
+    }
+  }
+  if (!best) return null; delete best.score; return best;
+}
+function loadCostList(list, file) {
+  const C = EQ.cost || {edits: {}, pick: {}, ai: {}};
+  EQ.cost = {...C, list: {...list, file}, unit: C.unit || list.unit || '', pick: {}, ai: {}};
+  costChanged(`설비비 목록 ${list.items.length}행을 읽었습니다 (${file} · ${list.sheet} 시트 ${list.headerRow}행 머리글).`);
+}
+async function readCostFile(file) {
+  try {
+    await loadScript(CDN.xlsx);
+    const wb = XLSX.read(await file.arrayBuffer(), {type: 'array'}), list = parseCostWorkbook(wb);
+    if (!list) { $('#cost-msg').textContent = `${file.name}: Tag(또는 설비명)과 금액(또는 단가) 머리글이 있는 표를 찾지 못했습니다.`; return; }
+    loadCostList(list, file.name);
+  } catch (e) { $('#cost-msg').textContent = `${file.name}을 읽지 못했습니다: ${e.message || e}`; }
+}
+/* ---- matching ---- */
+const nameTokens = s => new Set(String(s || '').toUpperCase().replace(/\(.*?\)/g, ' ').match(/[A-Z]{3,}|[가-힣]{2,}/g) || []);
+const jacc = (a, b) => { if (!a.size || !b.size) return 0; let n = 0; a.forEach(x => { if (b.has(x)) n++; }); return n / (a.size + b.size - n); };
+function computeCosts() {
+  const C = EQ.cost; if (!C) return null;
+  const rows = EQ.rows, keyOf = rows.map(eqKey), idx = {}, baseIdx = {};
+  keyOf.forEach((k, j) => { if (rows[j].untagged) return; (idx[k] = idx[k] || []).push(k); const b = k.replace(/[A-Z]$/, ''); (baseIdx[b] = baseIdx[b] || []).push(k); });
+  const items = (C.list && C.list.items) || [], assign = {}, how = {};
+  const tagged = new Set();
+  for (const it of items) {   // 1. tags
+    if (C.pick[it.i] !== undefined) continue;
+    const ks = [...new Set(it.tags.flatMap(t => idx[t] || baseIdx[t] || idx[t.replace(/[A-Z]$/, '')] || []))];
+    if (ks.length) { assign[it.i] = ks; how[it.i] = 'tag'; ks.forEach(k => tagged.add(k)); }
+  }
+  const free = keyOf.map((k, j) => [k, j]).filter(([k]) => !tagged.has(k)).map(([k, j]) => [k, j, nameTokens(rows[j].name)]);
+  for (const it of items) {   // 2. Claude suggestion, 3. similar name (unique best)
+    if (C.pick[it.i] !== undefined || assign[it.i]) continue;
+    const ai = (C.ai[it.i] || []).filter(k => keyOf.includes(k));
+    if (ai.length) { assign[it.i] = ai; how[it.i] = 'ai'; continue; }
+    if (it.tags.length) continue;   // a tag that is not on the PFD is not guessed by name
+    const t = nameTokens(it.name), sc = free.map(([k, , tk]) => [k, jacc(t, tk)]).sort((a, b) => b[1] - a[1]);
+    if (sc.length && sc[0][1] >= 0.6 && (sc.length < 2 || sc[0][1] - sc[1][1] >= 0.15)) { assign[it.i] = [sc[0][0]]; how[it.i] = 'name'; }
+  }
+  for (const [i, k] of Object.entries(C.pick)) { if (k && keyOf.includes(k)) { assign[i] = [k]; how[i] = 'pick'; } else if (k === '') { assign[i] = []; how[i] = 'none'; } }
+  const byKey = {};
+  for (const it of items) {
+    const ks = assign[it.i] || []; if (!ks.length || it.cost == null) continue;
+    ks.forEach(k => { const b = byKey[k] = byKey[k] || {cost: 0, how: how[it.i], items: []}; b.cost += it.cost / ks.length; b.items.push(it.i); if (ks.length > 1) b.split = ks.length; });
+  }
+  for (const [k, v] of Object.entries(C.edits)) if (keyOf.includes(k)) byKey[k] = {cost: v, how: 'edit', items: (byKey[k] || {}).items || []};
+  const unmatched = items.filter(it => !(assign[it.i] || []).length);
+  const total = items.reduce((a, it) => a + (it.cost || 0), 0), outside = unmatched.reduce((a, it) => a + (it.cost || 0), 0);
+  const pfd = Object.values(byKey).reduce((a, b) => a + b.cost, 0);
+  return {byKey, assign, how, unmatched, total, outside, pfd, keyOf};
+}
+const keyLabel = k => { const K = EQ.costCalc, r = K && EQ.rows[K.keyOf.indexOf(k)]; return r ? (r.untagged ? '(Tag 없음) ' + r.name : r.tag) : k; };
+const HOW = {tag: 'Tag 일치', name: '이름 유사 (확인)', ai: 'Claude 제안 (확인)', pick: '수동 매칭', edit: '직접 입력'};
+/* costs of the boxes in a flow card: tags in the box id or subtitle (hand-made boxes) */
+function costOfNodes(nodes) {
+  const K = EQ.costCalc; if (!K) return null;
+  const tags = new Set(nodes.flatMap(n => [...streamTags(n.id), ...streamTags(n.sub || n.tags || '')]).map(normTag));
+  let sum = 0, n = 0, of = 0;
+  K.keyOf.forEach(k => { if (!tags.has(k) && !tags.has(k.replace(/[A-Z]$/, ''))) return; of++; const b = K.byKey[k]; if (b) { sum += b.cost; n++; } });
+  return of ? {sum, n, of} : null;
+}
+/* ---- panel ---- */
+let costSaveT = null;
+function costChanged(msg) {
+  EQ.costCalc = computeCosts(); renderEquipment(); renderCostPanel();
+  if (msg) $('#cost-msg').textContent = msg;
+  if (S.result && !$('#result').hidden) showView();
+  clearTimeout(costSaveT);
+  if (S.project && S.recordId) costSaveT = setTimeout(() => { if (!busy()) saveRecord(); }, 2500);
+  else if (S.project) $('#cost-save').textContent = '흐름도를 생성하면 설비비 매칭도 기록에 함께 저장됩니다.';
+}
+function renderCostPanel() {
+  const C = EQ.cost, K = EQ.costCalc, box = $('#cost');
+  box.hidden = !EQ.rows.length; if (box.hidden) return;
+  $('#cost-unit').value = C ? C.unit || '' : '';
+  $('#cost-src').textContent = C && C.list ? `${C.list.file} · ${C.list.sheet} 시트 · 머리글 ${C.list.headerRow}행 (${Object.entries(C.list.cols).map(([k, v]) => `${{tag: 'Tag', name: '설비명', qty: '수량', unit: '단가', amount: '금액'}[k]}=${v}`).join(', ')})` : '수동 Equipment List(설비비 포함 Excel·CSV)를 올리면 PFD 설비와 매칭합니다. 표의 설비비 칸을 눌러 직접 입력할 수도 있습니다.';
+  $('#cost-ai').hidden = !(C && C.list && K && K.unmatched.length) || !window.claude; $('#cost-ai').disabled = busy();
+  $('#cost-clear').hidden = !(C && C.list);
+  if (!K) { $('#cost-sum').innerHTML = ''; $('#cost-un').hidden = true; return; }
+  const u = C.unit ? ' ' + C.unit : '', cnt = h => Object.values(K.byKey).filter(b => b.how === h).length;
+  const withCost = Object.keys(K.byKey).length, nTagged = EQ.rows.length;
+  $('#cost-sum').innerHTML = [
+    ['PFD 설비 설비비 합계', fmtCost(K.pfd) + u, ''], ['설비비 있는 설비', `${withCost} / ${nTagged}`, withCost < nTagged ? 'warn' : ''],
+    ...(C.list ? [['수동 목록', `${C.list.items.length}행 · ${fmtCost(K.total)}${u}`, ''], ['PFD에 없는 항목', `${K.unmatched.length}행 · ${fmtCost(K.outside)}${u}`, K.unmatched.length ? 'warn' : '']] : []),
+    ...['tag', 'name', 'ai', 'pick', 'edit'].map(h => [HOW[h], cnt(h) + '개', h === 'name' || h === 'ai' ? (cnt(h) ? 'warn' : '') : '']).filter(x => x[1] !== '0개')
+  ].map(([k, v, c]) => `<div class="sum"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+  const un = C.list ? C.list.items.filter(it => !(K.assign[it.i] || []).length || K.how[it.i] === 'name' || K.how[it.i] === 'ai') : [];
+  $('#cost-un').hidden = !un.length;
+  $('#cost-un-sum').textContent = `확인할 수동 목록 ${un.length}행 — PFD에 없거나, 이름·Claude로 맞춘 항목`;
+  $('#cost-dl').innerHTML = EQ.rows.map(r => `<option value="${esc(eqKey(r))}">${esc(r.tag + ' · ' + r.name)}</option>`).join('');
+  $('#cost-un-tbl').innerHTML = `<thead><tr><th>행</th><th style="text-align:left">Tag (원문)</th><th style="text-align:left">설비명</th><th>금액${esc(u)}</th><th style="text-align:left">매칭</th><th style="text-align:left">PFD 설비 (고르거나 비우기)</th></tr></thead><tbody>${un.map(it => {
+    const ks = K.assign[it.i] || [];
+    return `<tr><td class="num">${it.row}</td><td class="l mono">${esc(it.tagRaw || '–')}</td><td class="l">${esc(it.name || '–')}</td><td class="num">${fmtCost(it.cost)}</td><td class="l">${ks.length ? esc(HOW[K.how[it.i]] || '') : '<span style="color:var(--warn)">PFD에 없음</span>'}</td>
+      <td class="l"><input type="text" list="cost-dl" data-pick="${it.i}" value="${esc(ks.join(', '))}" placeholder="Tag 입력 또는 목록에서 고르기" aria-label="${esc((it.tagRaw || it.name) + ' 매칭할 PFD 설비')}" style="width:100%;min-width:200px;font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink)"></td></tr>`; }).join('')}</tbody>`;
+  $('#cost-un-tbl').querySelectorAll('[data-pick]').forEach(inp => inp.addEventListener('change', () => {
+    const v = inp.value.trim(), k = v ? (K.keyOf.includes(v) ? v : K.keyOf.includes(normTag(v)) ? normTag(v) : null) : '';
+    if (k === null) { inp.style.borderColor = 'var(--bad)'; $('#cost-msg').textContent = `"${v}"은 PFD Equipment List에 없는 Tag입니다.`; return; }
+    EQ.cost.pick[inp.dataset.pick] = k; costChanged(k ? `${keyLabel(k)}에 매칭했습니다.` : '이 항목을 PFD에 없는 항목으로 두었습니다.');
+  }));
+}
+/* typing a cost into the table */
+function editCost(td) {
+  if (td.querySelector('input')) return;
+  const k = td.dataset.k, cur = EQ.costCalc && EQ.costCalc.byKey[k] ? EQ.costCalc.byKey[k].cost : '';
+  td.innerHTML = `<input type="text" inputmode="decimal" value="${cur === '' ? '' : Math.round(cur * 100) / 100}" aria-label="설비비 입력" style="width:110px;font:inherit;font-size:12px;padding:2px 4px;text-align:right">`;
+  const inp = td.querySelector('input'); inp.focus(); inp.select();
+  let done = false;
+  const commit = save => { if (done) return; done = true;
+    if (save) { EQ.cost = EQ.cost || {list: null, unit: '', edits: {}, pick: {}, ai: {}}; const v = inp.value.trim();
+      if (v === '') delete EQ.cost.edits[k]; else { const x = costNum(v); if (x == null) { done = false; inp.style.borderColor = 'var(--bad)'; return; } EQ.cost.edits[k] = x; }
+      costChanged(); } else renderEquipment(); };
+  inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') commit(false); });
+  inp.addEventListener('blur', () => commit(true));
+}
+/* Claude pairs what tags and names could not */
+function costPrompt(un, cands) {
+  return `[[COST-MATCH]]
+너는 EPC 견적 엔지니어다. 왼쪽은 사람이 관리하는 설비비 목록 중 PFD Equipment List와 Tag로 맞지 않은 항목, 오른쪽은 아직 설비비가 없는 PFD 설비다.
+같은 설비(또는 설비 묶음)를 가리키는 짝을 찾는다.
+
+규칙
+- 설비명·종류·Tag 번호 체계(오기, 자릿수, 접두어 차이)를 보고 판단한다. 확실하지 않으면 짝을 만들지 않는다.
+- 목록 항목 하나가 PFD 설비 여러 개(예: 펌프 1/2, 같은 탱크 여러 기)를 가리키면 keys에 모두 넣는다.
+- PFD에 없는 항목(예: 예비품, 운송, 설치, 공통 자재)은 넣지 않는다.
+
+출력은 JSON 하나만: {"pairs":[{"item":3,"keys":["3200-PU-001","3200-PU-002"],"why":"짧은 근거"}]}
+
+## 설비비 목록 (item | Tag 원문 | 설비명 | 수량)
+${un.map(it => `${it.i} | ${it.tagRaw || '-'} | ${it.name || '-'} | ${it.qty ?? '-'}`).join('\n')}
+
+## PFD 설비 (key | Tag | 이름 | 종류 | Area)
+${cands.map(r => `${eqKey(r)} | ${r.tag} | ${r.name} | ${r.kind} | ${r.area}`).join('\n')}`;
+}
+async function costAi() {
+  const C = EQ.cost, K = EQ.costCalc; if (!C || !K || busy()) return;
+  try {
+    SAMPLE = SAMPLE || (window.claude ? await window.claude.use('sample') : null);
+    if (!SAMPLE) { $('#cost-msg').textContent = 'Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다.'; return; }
+    const un = K.unmatched.slice(0, 200), cands = EQ.rows.filter(r => !K.byKey[eqKey(r)]).slice(0, 600);
+    if (!un.length || !cands.length) return;
+    DESC_JOB.running = true; DESC_JOB.ctl = new AbortController(); renderCostPanel(); $('#cost-msg').textContent = `남은 ${un.length}행을 Claude가 PFD 설비와 맞추는 중…`;
+    calls++;
+    const r = await SAMPLE.json(costPrompt(un, cands), {signal: DESC_JOB.ctl.signal, modelTier: 'default'});
+    const ok = new Set(cands.map(eqKey)); let n = 0;
+    (r && Array.isArray(r.pairs) ? r.pairs : []).forEach(p => { const ks = (Array.isArray(p.keys) ? p.keys : []).map(String).filter(k => ok.has(k)); if (ks.length && un.some(it => it.i === +p.item)) { C.ai[+p.item] = ks; n++; } });
+    DESC_JOB.running = false; costChanged(`Claude가 ${n}행을 맞췄습니다. "Claude 제안 (확인)"으로 표시되며, 아래 표에서 고칠 수 있습니다.`);
+  } catch (e) { $('#cost-msg').textContent = errText(e); }
+  finally { DESC_JOB.running = false; renderCostPanel(); }
+}
+$('#eq-cost').onclick = () => $('#cost-file').click();
+$('#cost-file').onchange = e => { if (e.target.files[0]) readCostFile(e.target.files[0]); e.target.value = ''; };
+$('#cost-unit').addEventListener('change', e => { EQ.cost = EQ.cost || {list: null, unit: '', edits: {}, pick: {}, ai: {}}; EQ.cost.unit = e.target.value.trim(); costChanged(); });
+$('#cost-ai').onclick = costAi;
+$('#cost-clear').onclick = () => armed($('#cost-clear'), () => { if (!EQ.cost) return; EQ.cost = {...EQ.cost, list: null, pick: {}, ai: {}}; costChanged('설비비 목록을 뺐습니다. 직접 입력한 금액은 남겨 두었습니다.'); });
+$('#eq-tbl').addEventListener('click', e => { const td = e.target.closest('td.cost'); if (td) editCost(td); });
 
 /* =====================================================================
    9. Wiring
@@ -2489,7 +2742,7 @@ async function openExample() {
   if (!await openView(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), label, exampleProject())) return;
   const E = SAMPLE_DATA.equipment;
   if (E && E.rows) {
-    Object.assign(EQ, {rows: JSON.parse(JSON.stringify(E.rows)), refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label, file: E.file, sheets: E.sheets}, state: 'done'});
+    Object.assign(EQ, {rows: JSON.parse(JSON.stringify(E.rows)), refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label, file: E.file, sheets: E.sheets}, state: 'done', cost: E.cost ? JSON.parse(JSON.stringify(E.cost)) : null, costSig: ''});
     $('#eq').hidden = false; eqProgress(100, `${label} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
     linkEquipmentToFlow();
   }

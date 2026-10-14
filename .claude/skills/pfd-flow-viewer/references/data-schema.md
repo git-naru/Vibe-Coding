@@ -164,5 +164,16 @@ The app keeps its records in the viewer's private store (`data/users/<id>`), one
 | `record` | `rec-…` | `projectId`, `title`, `tabs` (labels), `streams`, `equipment`, `files`, `parts`, `size`, `createdAt`, `updatedAt` |
 | `part` | `part-<record id>-<n>` | `recordId`, `i`, `data`: a 60,000-character slice of `{"bundle": …, "equipment": {"rows", "refsMissing", "areaNames", "file", "sheets"}}` |
 
+The record's `equipment` may carry `cost`: the matched equipment costs.
+
+```jsonc
+"cost": {"unit": "USD",
+         "list": {"file": "eq-cost.xlsx", "sheet": "EQ COST", "headerRow": 3, "cols": {"tag": "Tag No.", "amount": "Amount (USD)"},
+                  "items": [{"i": 0, "row": 4, "tagRaw": "6300-BO-005/008", "tags": ["6300-BO-005", "6300-BO-008"], "name": "STEAM BOILER", "qty": 2, "cost": 2500000}]},
+         "pick": {"4": "6300-TK-029"},          // list item → PFD equipment chosen by the viewer ("" = not on the PFD)
+         "ai": {"9": ["6300-FA-015"]},          // Claude suggestions for items tags and names did not match
+         "edits": {"6300-PU-024": 7700}}        // costs typed into the table, by normalised tag
+```
+
 A record's JSON is split over part documents so a large main stream stays under the store's 256 KiB per-document limit;
 the record document itself stays small so a project's records list quickly.
