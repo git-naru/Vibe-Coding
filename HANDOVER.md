@@ -1,6 +1,6 @@
 # 인수인계 — PFD 공정 실적·투자비 산출
 
-작성 2026-10-14 · 기준 `main` = PR #5 머지(`d95e704`) 이후
+작성 2026-10-14 · 기준 `main` = PR #8 머지(`eb6a681`) 이후
 
 이 문서는 로컬에서 새 프로젝트를 구성하고 작업을 이어 가기 위한 인수인계입니다. 요구사항과 결정 이력은 PRD에, 데이터 형식은 `.claude/skills/pfd-flow-viewer/references/data-schema.md`에 있습니다.
 
@@ -25,7 +25,7 @@ PFD(Mass Balance 포함)를 읽어 공정 흐름도와 Equipment List를 만들�
 | 비공개 앱 (실데이터 예시 포함) | https://claude.ai/artifact/EiW5GCr21ZyWsHP9thBbYd | 소유자만 열람 |
 | PRD | https://claude.ai/code/artifact/803d79e1-ce3f-42f1-be0b-d8cceaa6ad81 | |
 
-병합 이력: #1 스킬·HTML 앱·Equipment List·CI → #2 메인 흐름 탭·구역별 줄 배치·비공개 샘플 슬롯 → #3 실적/투자비 2분할·프로젝트 기록·상세설명 프레임·패키지 보기·설비비 매칭 → #4 투자비 산출 → #5 도면 번호 없는 시트 찾기 수정.
+병합 이력: #1 스킬·HTML 앱·Equipment List·CI → #2 메인 흐름 탭·구역별 줄 배치·비공개 샘플 슬롯 → #3 실적/투자비 2분할·프로젝트 기록·상세설명 프레임·패키지 보기·설비비 매칭 → #4 투자비 산출 → #5 도면 번호 없는 시트 찾기 수정 → #6 인수인계 문서(HANDOVER.md·CLAUDE.md) → #7 로컬 `.venv`·`dist/` 무시(.gitignore) → #8 20MB 넘는 파일을 막지 않고 경고.
 
 ## 3. 저장소 구조
 
@@ -68,12 +68,12 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 | 6 | 생성 파이프라인 | `STEP_DEFS`, `buildFlow`, `generate`, `assemble`, `layout`(구역별 줄 배치), `linksOf`, `nodeInfoOf` |
 | 7 | 뷰어 | `renderViewer`(흐름도 + 상세설명 카드), `showBundle`, `packageView`(패키지별 보기), `showView`, 탭 |
 | 8 | 프로젝트·기록 저장 | `store`(db 또는 메모리), `saveRecord`(60,000자 part 분할), `openRecord`, `loadLegacy`, `importJson` |
-| 10 | Equipment List | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `runVision`(그림 판독), `downloadEquipment` |
+| 10 | Equipment List, Layout·GA | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `pageImage`, `runVision`(그림 판독), `downloadEquipment`; Layout: `LAY`, `isLayoutSheet`, `layoutIndex`(Tag 맞춤), `renderLayout`/`drawLayout`, `layoutSelect`, `gotoRow`, `setFileRole`(파일 시트를 Layout↔PFD로) |
 | 11 | 설비비 매칭 | `normTag`, `expandTags`, `parseCostWorkbook`, `computeCosts(C, rows)`, `costOfNodes`, `costAi` |
 | 12 | 공사물량·투자비 산출 | `capOf`, `bundlePackages`, `resolveTarget`, `readQtyFile`, `RATES`/`EXP_DEFAULT`, `learnFrom`, `estEquipment`, `estQuantities`, `estCompute`, `downloadEstimate` |
 | 9 | 화면 연결(마지막) | 버튼 핸들러, `openExample`, `adoptExample`, `go`(화면 이동) |
 
-전역 상태: `S`(입력 파일·시트·결과 묶음·현재 프로젝트·기록 id), `EQ`(Equipment List·설비비 `cost`·공사물량 `qty`·산출 `est`), `P`(프로젝트·기록 목록), `RATES`(공사 단가·지수), `REF`(학습한 실적 캐시), `V`(지금 보이는 흐름도, 패키지 보기면 `.base`에 원본).
+전역 상태: `S`(입력 파일·시트(`sheets` 공정, `layouts` Layout·GA)·결과 묶음·현재 프로젝트·기록 id), `EQ`(Equipment List·설비비 `cost`·공사물량 `qty`·산출 `est`), `P`(프로젝트·기록 목록), `RATES`(공사 단가·지수), `REF`(학습한 실적 캐시), `V`(지금 보이는 흐름도, 패키지 보기면 `.base`에 원본).
 
 claude.ai capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}`. db는 `data/users/<id>` 아래 개인 저장(본인만 보임), 문서당 256 KiB 한도라 기록은 part 문서로 나눈다.
 
@@ -124,6 +124,7 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 | `projects.js` | 프로젝트 생성 → PDF 업로드 → 생성 → 자동 저장 → 새로고침 → 기록 다시 열기(Claude 0회) → 수정·삭제, 상세설명 프레임 스크롤 |
 | `tabs.js` | 메인 + 계통 탭, 탭 추가, 저장·다시 열기, JSON 왕복 |
 | `eqtest.js`, `vis.js` | Equipment List(진행률·10행·PFD 새 창·Excel), 그림으로 설비 찾기·중지·이어하기 |
+| `layout.js`, `laycls.js` | Layout 카드 위치·Tag 맞춤(약식 Tag·목록에 없는 Tag)·선택·더블클릭 목록 이동·목록 클릭 선택·장 전환·Layout↔PFD 전환; 실제 PFD가 Layout으로 잘못 분류되지 않는지 |
 | `packages.js`, `example.js` | 패키지 생성·보기·설비 이동·다시 묶기, 손으로 그린 흐름도, 예시 프로젝트 가져오기 |
 | `costs.js` | 설비비 목록 인식·Tag/이름/Claude/수동 매칭·직접 입력·Excel 대조 |
 | `estimate.js` | 공사물량·단가·지수 → 산출(같은 PFD면 실적 그대로, 용량 ×2면 ×2^n)·직접 수정·저장 |
@@ -137,6 +138,7 @@ pfdcore 대조 테스트(`core/tests`)는 저장소 안에 있다. 가상 입력
 - 도면 번호는 `…-PFD-…`/`…-PID-…` 형식만 읽는다(다른 형식은 파일·쪽으로 대신 찾음). 스캔 PDF는 읽지 못한다(OCR 없음, PRD F13).
 - 설비 연결은 Claude가 도면 이미지로 추정한다. 도면의 선(벡터)을 직접 읽지 않는다.
 - PDF는 브라우저 메모리에 통째로 올려 읽는다. 크기 제한은 없지만 20MB가 넘는 파일은 경고를 띄우고(`BIG_FILE`), 아주 큰 파일은 탭이 멈출 수 있어 장 단위로 나눠 올리도록 안내한다.
+- Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
 - pdf.js에 `cMapUrl`을 주지 않아 CMap 파일이 필요한 글꼴(ToUnicode 없는 Adobe-Korea1 등 CJK CID 글꼴, 미리 정의된 인코딩)의 글자가 빠진다. 한글 설비명이 빠질 수 있다. 수정 방법과 다른 두 문제(설비비 Tag 칸의 쉼표 뒤 다른 Area Tag, JSON 내려받기에 Equipment List·설비비가 빠짐)는 `core/README.md` 끝.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
