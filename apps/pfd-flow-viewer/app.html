@@ -1015,6 +1015,7 @@ categories는 main(원료·공정 흐름), product(제품), recycle(재순환), 
 - streams: 포함할 Stream 전부. 연결 표시 설명으로 성격을 알 수 있으면 cat과 ko를 채우고, 모르면 cat은 비워 둔다.
 - categories: 라인 종류(최대 7개). key는 영문 소문자, label은 한국어(압력·온도 같은 구분이 보이면 포함).
 - 목록에 있는 도면 번호와 Stream 번호만 쓴다. 지어내지 않는다.
+- 도면 번호가 "(번호 없음)"인 시트는 mainSheets·sideSheets의 dwg에 세 번째 열(파일·페이지, 예: "plant.pdf p3")을 그대로 쓴다.
 
 출력은 JSON 하나만:
 {"title":"짧은 한국어 계통 이름","summary":"이 계통을 2~3문장으로",${isMain ? '"feed":"원료","product":"최종 제품",' : ''}"mainSheets":["도면번호"],"sideSheets":[{"dwg":"도면번호","streams":["980"]}],"categories":[{"key":"steam","label":"고압증기"}],"streams":[{"id":"980","cat":"steam","ko":"짧은 한국어 이름"}]}
@@ -1206,14 +1207,28 @@ async function buildFlow(system, isMain, maxImg) {
   // ---- scope
   setStep('scope', 'run', 'Claude 1회');
   const sc = await ask(scopePrompt(system, isMain), null, 'default');
-  const findSheet = d => S.links.sheetOf(String(d || '')) ;
-  const main = [...new Set((sc.mainSheets || []).map(findSheet).filter(Boolean))];
+  // a sheet is named by its drawing number, or (no number read) by "file pN", its title, or "pN"
+  const findSheet = d => { const t = String(d || '').trim(), T = t.toUpperCase(); if (!t) return null;
+    return S.links.sheetOf(t) || S.sheets.find(sh => sh.key === t || sh.key.toUpperCase() === T) || S.sheets.find(sh => sh.title && sh.title.toUpperCase() === T)
+      || S.sheets.find(sh => sh.dwg && (T.includes(sh.dwg) || T.includes(canon(sh.dwg))))
+      || (/^P\.?\s*(\d+)$/i.test(t) && S.sheets.filter(sh => sh.page === +t.replace(/\D/g, '')).length === 1 ? S.sheets.find(sh => sh.page === +t.replace(/\D/g, '')) : null) || null; };
+  let main = [...new Set((sc.mainSheets || []).map(findSheet).filter(Boolean))];
   const side = (sc.sideSheets || []).map(x => ({sh: findSheet(x.dwg), streams: (x.streams || []).map(String)})).filter(x => x.sh && !main.includes(x.sh));
-  if (!main.length) throw {code: 'no_scope', message: '계통에 해당하는 시트를 찾지 못했습니다. 계통 이름을 바꿔 보세요.'};
+  if (!main.length && isMain) {   // the main stream runs through the process sheets: use every sheet that has text
+    main = S.sheets.filter(sh => sh.textLayer && !side.some(x => x.sh === sh));
+    S.scopeNote = `Claude가 고른 시트(${(sc.mainSheets || []).slice(0, 4).join(', ') || '없음'})를 입력 시트와 맞추지 못해 올린 시트 ${main.length}장을 모두 썼습니다.`;
+  }
+  if (!main.length) {
+    const noNum = S.sheets.filter(sh => !sh.dwg).length, scan = S.sheets.filter(sh => !sh.textLayer).length;
+    throw {code: 'no_scope', message: `"${system}"에 해당하는 시트를 찾지 못했습니다. ` + (scan === S.sheets.length ? '올린 PDF가 모두 스캔본(글자 없는 이미지)이라 읽을 수 없습니다.'
+      : (sc.mainSheets || []).length ? `Claude가 고른 시트(${sc.mainSheets.slice(0, 4).join(', ')})가 입력 시트와 맞지 않습니다${noNum ? ` — 도면 번호를 읽지 못한 시트가 ${noNum}장 있습니다` : ''}.`
+      : '이 계통이 도면에 없는 것 같습니다. 도면 제목에 쓰인 말(예: STEAM, WATER)로 바꾸거나 비워서 메인 흐름만 만들어 보세요.')};
+  }
   const cats = (sc.categories || []).filter(c => c && c.key).slice(0, 7);
   if (!cats.length) cats.push({key: 'flow', label: '공정 흐름'});
+  const scopeNote = S.scopeNote || ''; S.scopeNote = '';
   const scopeStreams = {}; (sc.streams || []).forEach(s => scopeStreams[String(s.id)] = s);
-  setStep('scope', 'done', `${sc.title || system} · 주 시트 ${main.length}장, 연결 시트 ${side.length}장`);
+  setStep('scope', 'done', `${sc.title || system} · 주 시트 ${main.length}장, 연결 시트 ${side.length}장${scopeNote ? ' · ' + scopeNote : ''}`);
 
   // ---- topology per sheet
   const work = [...main.map(sh => ({sh, streams: [...new Set([...sh.badges, ...sh.connectors.filter(c => c.kind === 'flow' && c.stream).map(c => c.stream)])], main: true})),
