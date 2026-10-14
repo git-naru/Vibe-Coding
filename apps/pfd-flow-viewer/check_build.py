@@ -23,6 +23,9 @@ def main():
     assert "__DEMO_DATA__" not in html, "demo data placeholder was not replaced"
     assert "__SAMPLE_DATA__" not in html, "sample data placeholder was not replaced"
     assert '<script id="sample-data" type="application/json">null</script>' in html, "repository build must not carry a real-data sample"
+    assert "__CMAP_DATA__" not in html, "CMap placeholder was not replaced"
+    cm = re.search(r'<script id="cmap-data" type="application/json">(.*?)</script>', html, re.S)
+    assert cm and "Adobe-Korea1-UCS2" in json.loads(cm.group(1)), "Korean CMaps missing from the build"
     demo = re.search(r'<script id="demo-data" type="application/json">(.*?)</script>', html, re.S)
     assert demo, "demo-data script block missing"
     data = json.loads(demo.group(1).replace("<\\/", "</"))

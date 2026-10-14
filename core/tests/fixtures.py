@@ -271,13 +271,15 @@ def rates_xlsx(path):
 
 
 def cjk_pdf(path):
-    """Korean labels in two fonts pdf.js can only read with its CMap files: an Adobe-Korea1 CID font without
-    /ToUnicode, and a font with the predefined UniKS-UCS2-H encoding (both not embedded, text made up)."""
+    """Labels in fonts pdf.js can only read with its CMap files (not embedded, text made up): Korean in an
+    Adobe-Korea1 CID font without /ToUnicode and in a UniKS-UCS2-H font (the app carries those CMaps), and
+    Japanese in an Adobe-Japan1 CID font without /ToUnicode (it does not)."""
     from pdfminer.cmapdb import CMapDB
-    korea1 = CMapDB.get_unicode_map("Adobe-Korea1", False)
-    cid_of = {}
-    for cid, u in getattr(korea1, "cid2unichr", {}).items():
+    cid_of, jcid_of = {}, {}
+    for cid, u in CMapDB.get_unicode_map("Adobe-Korea1", False).cid2unichr.items():
         cid_of.setdefault(u, cid)
+    for cid, u in CMapDB.get_unicode_map("Adobe-Japan1", False).cid2unichr.items():
+        jcid_of.setdefault(u, cid)
     w = PdfWriter()
     desc = w.add("<< /Type /FontDescriptor /FontName /MadeUpMyungjo /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700 /StemV 80 >>")
     k1 = w.add(f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /MadeUpMyungjo /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> /FontDescriptor {desc} 0 R /DW 1000 >>")
@@ -285,15 +287,19 @@ def cjk_pdf(path):
     k2 = w.add(f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /MadeUpMyungjo /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> /FontDescriptor {desc} 0 R /DW 900 >>")
     f2 = w.add(f"<< /Type /Font /Subtype /Type0 /BaseFont /MadeUpMyungjo /Encoding /UniKS-UCS2-H /DescendantFonts [{k2} 0 R] >>")
     f3 = w.add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+    jdesc = w.add("<< /Type /FontDescriptor /FontName /MadeUpMincho /Flags 6 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700 /StemV 80 >>")
+    j1 = w.add(f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /MadeUpMincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 4 >> /FontDescriptor {jdesc} 0 R /DW 1000 >>")
+    f4 = w.add(f"<< /Type /Font /Subtype /Type0 /BaseFont /MadeUpMincho /Encoding /Identity-H /DescendantFonts [{j1} 0 R] >>")
     hexcid = lambda s: "<" + "".join(f"{cid_of[c]:04X}" for c in s) + ">"
     ucs2 = lambda s: "<" + "".join(f"{ord(c):04X}" for c in s) + ">"
     ops = [f"BT /F3 7 Tf 1 0 0 1 100 500 Tm (2000-TK-001) Tj ET",
            f"BT /F1 7 Tf 1 0 0 1 100 512 Tm {hexcid('급수탱크')} Tj ET",
            f"BT /F2 7 Tf 1 0 0 1 100 450 Tm {ucs2('보일러')} Tj ET",
-           f"BT /F3 7 Tf 1 0 0 1 100 440 Tm (2000-BO-002) Tj ET"]
+           f"BT /F3 7 Tf 1 0 0 1 100 440 Tm (2000-BO-002) Tj ET",
+           "BT /F4 7 Tf 1 0 0 1 100 380 Tm <" + "".join(f"{jcid_of[c]:04X}" for c in "ポンプ") + "> Tj ET"]
     c = w.stream("\n".join(ops))
     pages_id = len(w.objs) + 2
-    page = w.add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 842 595] /Contents {c} 0 R /Resources << /Font << /F1 {f1} 0 R /F2 {f2} 0 R /F3 {f3} 0 R >> >> >>")
+    page = w.add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 842 595] /Contents {c} 0 R /Resources << /Font << /F1 {f1} 0 R /F2 {f2} 0 R /F3 {f3} 0 R /F4 {f4} 0 R >> >> >>")
     w.add(f"<< /Type /Pages /Kids [{page} 0 R] /Count 1 >>")
     root = w.add(f"<< /Type /Catalog /Pages {pages_id} 0 R >>")
     w.save(path, root)

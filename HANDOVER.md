@@ -39,7 +39,8 @@ PFD(Mass Balance 포함)를 읽어 공정 흐름도와 Equipment List를 만들�
   examples/demo-steam.json    가상 데이터 예제
 apps/pfd-flow-viewer/
   app.html                    HTML 앱 원본 (__DEMO_DATA__, __SAMPLE_DATA__ 자리표시)
-  build.py                    단일 HTML 빌드: 예제 삽입, --sample 로 비공개 예시 삽입
+  build.py                    단일 HTML 빌드: 예제·한글 CMap 삽입, --sample 로 비공개 예시 삽입
+  cmaps/                      pdf.js 3.11.174의 한글 CMap 24개(Adobe 라이선스). 빌드 때 #cmap-data로 들어감
   check_build.py              CI 검사: 자리표시 치환, sample-data가 null인지, 스크립트 추출
 core/
   pfdcore/                    Python 패키지: pdf, sheets, streams, equipment, layout, cost, estimate, export, xlsx·ssf(SheetJS 읽기), js(JavaScript 동작)
@@ -53,7 +54,7 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 
 ## 4. HTML 앱 구조 (`app.html`)
 
-한 파일 안에 CSS, 마크업(화면 4개 + 대화상자), 스크립트가 있다. 외부 라이브러리는 jsdelivr CDN에서 필요할 때 불러온다: pdf.js 3.11.174, SheetJS 0.18.5, mammoth 1.8.0, dagre 0.8.5.
+한 파일 안에 CSS, 마크업(화면 4개 + 대화상자), 스크립트가 있다. 외부 라이브러리는 jsdelivr CDN에서 필요할 때 불러온다: pdf.js 3.11.174, SheetJS 0.18.5, mammoth 1.8.0, dagre 0.8.5. pdf.js의 한글 CMap은 CDN에서 받지 않고 빌드 때 `#cmap-data`로 넣은 것을 `CMapReader`가 내준다(`openPdfDoc`).
 
 화면: 시작(좌 "실적 입력" / 우 "투자비 산출" 2분할) → 실적 입력(프로젝트 목록) → 프로젝트 화면(공정 데이터 입력, 기록, Equipment List, 설비비 매칭, 공사물량, 흐름도, 상세설명 프레임) / 투자비 산출(산출 프로젝트, 공사 단가, 산출 기준). 산출 프로젝트도 같은 프로젝트 화면을 쓰고 "투자비 산출" 카드가 붙는다.
 
@@ -140,7 +141,7 @@ pfdcore 대조 테스트(`core/tests`)는 저장소 안에 있다. 가상 입력
 - PDF는 브라우저 메모리에 통째로 올려 읽는다. 크기 제한은 없지만 20MB가 넘는 파일은 경고를 띄우고(`BIG_FILE`), 아주 큰 파일은 탭이 멈출 수 있어 장 단위로 나눠 올리도록 안내한다.
 - Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
-- pdf.js에 `cMapUrl`을 주지 않아 CMap 파일이 필요한 글꼴(ToUnicode 없는 Adobe-Korea1 등 CJK CID 글꼴, 미리 정의된 인코딩)의 글자가 빠진다. 한글 설비명이 빠질 수 있다. 수정 방법과 다른 두 문제(설비비 Tag 칸의 쉼표 뒤 다른 Area Tag, JSON 내려받기에 Equipment List·설비비가 빠짐)는 `core/README.md` 끝.
+- PDF 글꼴: 한글 CMap은 화면에 들어 있어(`cmaps/`, `CMapReader`) ToUnicode 없는 한글 CID 글꼴·KS 인코딩도 읽는다. 일본어·중국어(Adobe-Japan1/GB1/CNS1) CID 글꼴은 CMap이 없어 글자가 빠진다(다른 CMap은 불러오지 않음). 남은 앱 문제 두 가지(설비비 Tag 칸의 쉼표 뒤 다른 Area Tag, JSON 내려받기에 Equipment List·설비비가 빠짐)는 `core/README.md` 끝.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
 
 ## 10. 다음 단계

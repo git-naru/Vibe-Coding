@@ -7,9 +7,10 @@ separate runs) and pdf.js's page viewport. pdfminer.six parses the file, the con
 (byte → character code → Unicode); glyph widths follow pdf.js (font /Widths, /W, /DW, /MissingWidth).
 
 Not reproduced (reported in `Sheet['warnings']`): vertical writing, right-to-left text, annotation
-appearance streams, and pdf.js's merging of many small repeated images. Fonts pdf.js cannot load without its
-CMap files are dropped as the app drops them (warning "cmap-font"; see `read_pdf(cmap_fonts=...)`). When they
-are read instead, their CID → Unicode tables are pdfminer's, which can differ from pdf.js's for rare CIDs.
+appearance streams, and pdf.js's merging of many small repeated images. The app gives pdf.js only the Korean
+CMaps (APP_CMAPS); a font needing another CMap (Japanese, Chinese) is dropped as the app drops it (warning
+"cmap-font"; see `read_pdf(cmap_fonts=...)`). CID → Unicode tables are pdfminer's, which can differ from
+pdf.js's for rare CIDs.
 """
 import math
 import unicodedata
@@ -110,20 +111,32 @@ _RTL = js.rx("[֐-ࣿיִ-﷿ﹰ-﻿]")
 
 # ---- fonts ---------------------------------------------------------------------------------------
 CMAP_ORDERINGS = ("GB1", "CNS1", "Japan1", "Korea1")
+# the CMaps the app carries (apps/pfd-flow-viewer/cmaps, inlined by build.py); a font needing any other is lost
+APP_CMAPS = frozenset((
+    "Adobe-Korea1-0", "Adobe-Korea1-1", "Adobe-Korea1-2", "Adobe-Korea1-UCS2", "KSC-EUC-H", "KSC-EUC-V", "KSC-H",
+    "KSC-Johab-H", "KSC-Johab-V", "KSC-V", "KSCms-UHC-H", "KSCms-UHC-HW-H", "KSCms-UHC-HW-V", "KSCms-UHC-V",
+    "KSCpc-EUC-H", "KSCpc-EUC-V", "UniKS-UCS2-H", "UniKS-UCS2-V", "UniKS-UTF16-H", "UniKS-UTF16-V",
+    "UniKS-UTF32-H", "UniKS-UTF32-V", "UniKS-UTF8-H", "UniKS-UTF8-V",
+))
 
 
-def needs_cmap_files(spec):
-    """True when pdf.js can only load this font with its CMap files (`cMapUrl`), which the app does not give it:
-    a Type0 font whose encoding is a predefined CMap other than Identity-H/V (or an embedded CMap that uses one),
-    or one without /ToUnicode whose CIDs are Adobe-GB1/CNS1/Japan1/Korea1."""
+def cmaps_needed(spec):
+    """The pdf.js CMap files a font needs: a Type0 font's predefined encoding other than Identity-H/V (or the CMap
+    an embedded encoding uses), and `<Registry>-<Ordering>-UCS2` when it has no /ToUnicode and its CIDs are
+    Adobe-GB1/CNS1/Japan1/Korea1. Empty for every other font."""
     if not (isinstance(spec.get("Subtype"), PSLiteral) and literal_name(spec["Subtype"]) == "Type0"):
-        return False
+        return set()
+    need = set()
     enc = resolve1(spec.get("Encoding"))
     if isinstance(enc, PSLiteral) and literal_name(enc) not in ("Identity-H", "Identity-V"):
-        return True
+        need.add(literal_name(enc))
     if isinstance(enc, PDFStream):
-        if enc.get("UseCMap") is not None or b"usecmap" in (enc.get_data() or b""):
-            return True
+        use = resolve1(enc.get("UseCMap"))
+        if isinstance(use, PSLiteral):
+            need.add(literal_name(use))
+        m = js.match(r"/(\S+)\s+usecmap", (enc.get_data() or b"").decode("latin-1"))
+        if m:
+            need.add(m.group(1))
     tu = resolve1(spec.get("ToUnicode"))
     has_tu = isinstance(tu, PDFStream) and len(tu.get_data() or b"") > 0
     if not has_tu:
@@ -132,8 +145,8 @@ def needs_cmap_files(spec):
         reg, order = resolve1(csi.get("Registry")), resolve1(csi.get("Ordering"))
         dec = lambda b: b.decode("latin-1") if isinstance(b, bytes) else js.jstr(b)
         if dec(reg) == "Adobe" and dec(order) in CMAP_ORDERINGS:
-            return True
-    return False
+            need.add(f"Adobe-{dec(order)}-UCS2")
+    return need
 
 
 class ErrorFont:
@@ -741,8 +754,8 @@ class _Reader:
         if key not in self.fonts:
             try:
                 spec = dict_value(ref)
-                if self.cmap_fonts == "app" and needs_cmap_files(spec):
-                    self.warn("cmap-font")   # the app drops this font's text: pdf.js gets no cMapUrl
+                if self.cmap_fonts == "app" and not cmaps_needed(spec) <= APP_CMAPS:
+                    self.warn("cmap-font")   # the app drops this font's text: pdf.js cannot load the CMap it needs
                     self.fonts[key] = ErrorFont()
                 else:
                     self.fonts[key] = Font(rsrcmgr, ref.objid if isinstance(ref, PDFObjRef) else None, spec)
@@ -859,8 +872,8 @@ def read_pdf(path_or_bytes, name=None, file_id=1, cmap_fonts="app"):
     """Every page of a PDF as a sheet record (see make_sheet), plus pdf-reading warnings per sheet.
     Process sheets and Layout/GA drawings come together; `layout.split_sheets` sorts them as the app does.
 
-    cmap_fonts="app" drops the text of fonts pdf.js cannot load without its CMap files, as the app does
-    (warning "cmap-font"); "read" reads them, as the app would if it gave pdf.js a cMapUrl."""
+    cmap_fonts="app" drops the text of fonts needing a CMap the app does not carry (only Korean ones), as the app
+    does (warning "cmap-font"); "read" reads them all, as the app would with every pdf.js CMap."""
     if isinstance(path_or_bytes, (bytes, bytearray)):
         data = bytes(path_or_bytes)
     else:
