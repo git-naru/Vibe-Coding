@@ -135,3 +135,25 @@ A flow may also be given as topology only — `nodes` without coordinates plus
 `"edges": [{"id": "422", "from": "4300-RX-008", "to": "4400-TK-073"}]` and no `lines` — and the app
 lays it out (dagre) the first time it opens. `links` (same shape as `edges`) keeps the equipment tags at
 each stream's ends so the equipment list can pick up stream values.
+
+Optional `desc` on a flow holds the plain-language role of each equipment and line, keyed like `nodeInfo`
+and `streams`. The HTML app writes it with Claude after generation (or from the detail frame's "설명 작성")
+and shows it at the top of each card in the detail frame:
+
+```jsonc
+"desc": {"nodes": {"4300-RX-002": "정제 염수와 Soda Ash 용액을 받아 탄산리튬을 침전시키는 반응조…"},
+         "streams": {"422": "탄산화 반응조에서 시크너로 가는 습윤 Li₂CO₃ 슬러리…"}, "at": 1760000000000}
+```
+
+## Projects and records (HTML app)
+
+The app keeps its records in the viewer's private store (`data/users/<id>`), one document per item:
+
+| `kind` | id | fields |
+|---|---|---|
+| `project` | `proj-…` | `name`, `product`, `capacity`, `site`, `year`, `memo`, `records`, `equipment`, `createdAt`, `updatedAt` |
+| `record` | `rec-…` | `projectId`, `title`, `tabs` (labels), `streams`, `equipment`, `files`, `parts`, `size`, `createdAt`, `updatedAt` |
+| `part` | `part-<record id>-<n>` | `recordId`, `i`, `data`: a 60,000-character slice of `{"bundle": …, "equipment": {"rows", "refsMissing", "areaNames", "file", "sheets"}}` |
+
+A record's JSON is split over part documents so a large main stream stays under the store's 256 KiB per-document limit;
+the record document itself stays small so a project's records list quickly.

@@ -1,9 +1,10 @@
-<title>PFD 흐름도 만들기</title>
+<title>공정 실적·투자비</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: one working column — upload card, saved list, then the generated flow viewer
-   (drafting-sheet diagram + docked stream panel). Category line colours are generated at runtime. */
+/* Screens: a start screen split into two halves (record input | investment estimate), then one working
+   column per screen — project list, a project (upload card, its records, equipment list, flow viewer with a
+   separately scrolling detail frame), and the estimate placeholder. Category line colours are generated at runtime. */
 :root{
   --bg:#f3f5f2; --paper:#fbfcfa; --ink:#1b2326; --muted:#5b666a; --rule:#d3d9d4; --grid:#e6eae5; --panel:#ffffff; --chip:#eef1ed;
   --ok:#0d8478; --warn:#b4570a; --bad:#b02a1f; --focus:#1d5fae; --accent:#1d5fae; --accent-ink:#ffffff;
@@ -18,7 +19,7 @@
   --ok:#45c9b9; --warn:#ffa152; --bad:#ff6f61; --focus:#6ea9ff; --accent:#6ea9ff; --accent-ink:#0d1418; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
 .wrap{max-width:1680px;margin:0 auto;padding-block:20px 48px;padding-inline:16px;display:flex;flex-direction:column;gap:16px}
 .eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 h1{font-size:22px;line-height:1.25;margin:2px 0 0;font-weight:700;text-wrap:balance}
@@ -70,6 +71,7 @@ input[type=text]{font:inherit;font-size:14px;padding:6px 10px;border:1px solid v
 .saved li{display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--rule)}
 .saved ul{list-style:none;margin:0;padding:0}
 .saved .t{font-weight:600;font-size:13px;overflow-wrap:anywhere}
+.saved li[aria-current="true"] .t::before{content:'● ';color:var(--accent)}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
 .toolbar .btns{display:flex;flex-wrap:wrap;gap:8px}
 /* ---- viewer (same look as the skill's viewer template) ---- */
@@ -89,7 +91,7 @@ input[type=text]{font:inherit;font-size:14px;padding:6px 10px;border:1px solid v
 .sheets{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;font-size:12.5px}
 .sheets summary{cursor:pointer;color:var(--muted);font-family:var(--f-mono);font-size:12px}
 .sheets summary b{color:var(--ink);font-weight:600}
-.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;align-items:start}
 @media (max-width:1100px){.main{grid-template-columns:minmax(0,1fr)}}
 .sheet{background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow-x:auto;min-width:0}
 .sheet svg{display:block;width:100%;height:auto}
@@ -202,18 +204,154 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .pfdview .stage{position:relative;transform-origin:0 0}
 .pfdview img{display:block;max-width:none}
 .pfdview .hl{position:absolute;border:3px solid #e0301e;border-radius:4px;box-shadow:0 0 0 4px rgba(224,48,30,.25)}
+/* ---- start screen: two halves ---- */
+.home{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.home-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--paper)}
+.home-top .name{font-weight:700;font-size:15px}
+.halves{flex:1;display:grid;grid-template-columns:1fr 1fr;min-height:0}
+.half{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-start;gap:16px;padding:clamp(40px,22vh,240px) clamp(20px,5vw,72px) 48px;transition:background .15s;min-width:0}
+.half+.half{border-left:1px solid var(--rule)}
+.half.rec{background:color-mix(in srgb,var(--accent) 6%,var(--bg))}
+.half.est{background:color-mix(in srgb,var(--ok) 6%,var(--bg))}
+.half.rec:hover{background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
+.half.est:hover{background:color-mix(in srgb,var(--ok) 12%,var(--bg))}
+.half:focus-visible{outline:3px solid var(--focus);outline-offset:-8px}
+.half .num{font:600 12px var(--f-mono);letter-spacing:.1em;color:var(--muted)}
+.half .h{font-size:clamp(30px,4vw,46px);font-weight:700;line-height:1.15}
+.half .d{color:var(--muted);max-width:44ch;font-size:15px;line-height:1.65}
+.half ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:13.5px;max-width:46ch}
+.half .stat{font-size:13.5px;font-weight:600;color:var(--ink);min-height:1.5em}
+.half .go{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+.half.rec .go{color:var(--accent)}.half.est .go{color:var(--ok)}
+.half .pill{align-self:flex-start;color:var(--warn)}
+@media (max-width:760px){.halves{grid-template-columns:1fr}.half+.half{border-left:none;border-top:1px solid var(--rule)}.half{padding:40px 20px;min-height:50vh;justify-content:center}}
+/* ---- screens, project list, dialog ---- */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:13px;color:var(--muted)}
+.crumbs button{border:none;background:none;padding:2px 4px;color:var(--focus);font-size:13px}
+.crumbs .sep{color:var(--muted)}
+.crumbs .cur{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.screen{display:flex;flex-direction:column;gap:16px}
+.projgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.proj{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--rule);border-radius:6px;padding:12px 14px;background:var(--paper);display:flex;flex-direction:column;gap:6px;min-width:0}
+.proj:hover{border-color:var(--focus)}
+.proj:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.proj .t{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.proj .m{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.proj .n{display:flex;flex-wrap:wrap;gap:4px 12px;font:12px var(--f-mono);color:var(--muted)}
+.proj .n b{color:var(--ink);font-weight:600}
+.empty{border:1.5px dashed var(--rule);border-radius:6px;padding:24px 16px;text-align:center;color:var(--muted);font-size:13px}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.phead{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+.pmeta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--muted);margin-top:6px}
+.pmeta b{color:var(--ink);font-weight:600}
+.notice{font-size:13px;border-radius:5px;padding:8px 10px;background:var(--chip);border-left:3px solid var(--warn)}
+dialog{border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink);padding:0;width:min(540px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dform{display:flex;flex-direction:column;gap:12px;padding:18px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12.5px;color:var(--muted)}
+.field input,.field textarea{flex:none;font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);width:100%;max-width:none}
+.field textarea{min-height:64px;resize:vertical}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.f2{grid-template-columns:1fr}}
+.estlist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+/* ---- detail frame: every equipment and line, scrolls on its own beside the diagram ---- */
+.detail{background:var(--panel);border:1px solid var(--rule);border-radius:6px;display:flex;flex-direction:column;min-width:0;position:sticky;top:12px;height:calc(100vh - 24px);height:calc(100dvh - 24px);overflow:hidden}
+.d-head{padding:12px 14px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:8px;flex:none}
+.d-head .r{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px}
+.d-head input[type=search]{font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);flex:1 1 140px;min-width:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:5px;overflow:hidden;flex:none}
+.seg button{border:none;border-radius:0;padding:4px 10px;font-size:12.5px;background:var(--panel)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed=true]{background:var(--chip);font-weight:600}
+.d-body{flex:1;overflow:auto;overscroll-behavior:contain;padding:0 12px 14px;position:relative;display:flex;flex-direction:column;gap:10px}
+.d-body:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.d-sec{font:600 11.5px var(--f-mono);letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:10px 2px 6px;position:sticky;top:0;background:var(--panel);z-index:1;margin-bottom:-4px}
+.dcard{border:1px solid var(--rule);border-radius:6px;background:var(--paper);display:flex;flex-direction:column;gap:10px;padding:10px 12px;min-width:0}
+.dcard.sel{border-color:var(--focus);box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 30%,transparent)}
+.dc-head{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;min-width:0}
+.dc-head:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.dc-k{font:600 16px var(--f-mono);font-variant-numeric:tabular-nums}
+.dc-t{font-weight:600;font-size:14px;flex:1 1 150px;min-width:0;overflow-wrap:anywhere}
+.dc-tag{font:12px var(--f-mono);color:var(--muted);overflow-wrap:anywhere;width:100%}
+.dc-desc{margin:0;font-size:13px;line-height:1.65}
+.dc-desc.none{color:var(--muted);font-size:12.5px}
+.dcard details summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.dcard details[open]>summary{margin-bottom:8px}
+.dcard details>div{display:flex;flex-direction:column;gap:12px}
+.dcard .kpi .v{font-size:15px}
+@media (max-width:1100px){.detail{position:static;height:72vh}}
 </style>
 
-<div class="wrap">
-  <header>
-    <div class="eyebrow">PFD Flow Viewer</div>
-    <h1>PFD 흐름도 만들기</h1>
-    <p class="lede">PFD와 Mass Balance 파일을 올리면 원료에서 제품까지의 메인 흐름을 시트를 넘나들며 이어 그리고, 스팀·용수 같은 다른 계통은 별도 탭으로 보여줍니다. PDF를 올리면 Equipment List도 바로 만들어 Excel로 내려받을 수 있습니다. 파일 읽기·설비 목록·수지 검증·그리기는 브라우저가 하고, Claude는 계통 범위와 연결 해석, 이미지로 된 표 판독에만 씁니다.</p>
-  </header>
+<main class="home" id="home" aria-label="시작">
+  <div class="home-top"><span class="name">공정 실적 · 투자비 산출</span><span class="muted">PFD(Mass Balance 포함) 기반</span></div>
+  <div class="halves">
+    <button type="button" class="half rec" id="go-rec" aria-describedby="home-rec-d">
+      <span class="num">01 · 실적 쌓기</span>
+      <span class="h">실적 입력</span>
+      <span class="d" id="home-rec-d">프로젝트별로 PFD·P&amp;ID·Mass Balance를 올리면 공정 흐름도와 Equipment List를 만들고, 설비·라인마다 상세설명을 붙여 실적으로 누적합니다.</span>
+      <span class="stat" id="home-stat"></span>
+      <span class="go">실적 입력으로 →</span>
+    </button>
+    <button type="button" class="half est" id="go-est" aria-describedby="home-est-d">
+      <span class="num">02 · 실적 활용</span>
+      <span class="h">투자비 산출</span>
+      <span class="d" id="home-est-d">새 프로젝트의 공정 Data를 넣으면 쌓인 실적과 설비·용량을 비교해 투자비를 산출합니다.</span>
+      <span class="pill">다음 단계에서 구현</span>
+      <span class="go">투자비 산출로 →</span>
+    </button>
+  </div>
+</main>
 
-  <div class="cols" id="setup-cols">
-    <section class="card" id="setup" aria-label="새 흐름도 만들기">
-      <h2>새 흐름도</h2>
+<div class="wrap" id="app" hidden>
+  <nav class="crumbs" aria-label="위치"><button type="button" id="nav-home">처음 화면</button><span class="sep" aria-hidden="true">/</span><button type="button" id="nav-rec" hidden>실적 입력</button><span class="sep" id="nav-sep2" aria-hidden="true" hidden>/</span><span class="cur" id="nav-cur"></span></nav>
+
+  <section class="screen" id="records" hidden aria-label="실적 입력">
+    <header>
+      <div class="eyebrow">01 · 실적 입력</div>
+      <h1>프로젝트</h1>
+      <p class="lede">프로젝트를 만들고 그 안에 공정 데이터(PFD, P&amp;ID, Mass Balance)를 올리면 흐름도·Equipment List·상세설명이 실적 기록으로 쌓입니다. 쌓인 실적은 투자비 산출에 씁니다.</p>
+    </header>
+    <div class="cols">
+      <section class="card" aria-label="프로젝트 목록">
+        <div class="toolbar"><h2>프로젝트 <span class="muted" id="proj-count"></span></h2><div class="btns"><input type="search" id="proj-q" placeholder="프로젝트 찾기" aria-label="프로젝트 찾기" style="font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);width:180px"><button type="button" class="primary" id="proj-new">새 프로젝트</button></div></div>
+        <div class="notice" id="store-note" hidden></div>
+        <div class="projgrid" id="proj-list"><div class="empty">불러오는 중…</div></div>
+      </section>
+      <div class="side">
+        <section class="card" aria-label="둘러보기">
+          <h2>둘러보기</h2>
+          <div class="row">
+            <button type="button" id="demo">예시 보기 (가상)</button>
+            <button type="button" class="primary" id="sample" hidden>실적 샘플 보기</button>
+            <button type="button" id="open-json">JSON 파일 열기</button>
+            <input type="file" id="json-file" accept=".json,application/json" hidden>
+          </div>
+          <p class="muted" style="margin:0">프로젝트에 저장되지 않는 보기입니다. "예시 보기"는 기능 확인용 가상 데이터입니다.</p>
+          <p class="muted" id="sample-note" hidden style="margin:0"></p>
+        </section>
+        <section class="card saved" id="legacy" hidden aria-label="프로젝트 미지정 흐름도">
+          <h2>프로젝트 미지정 흐름도</h2>
+          <ul id="legacy-list"></ul>
+          <p class="muted" style="margin:0">프로젝트 기능 전에 저장한 흐름도입니다. 열어서 보거나 JSON으로 내려받아 프로젝트에 가져올 수 있습니다.</p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="project" hidden aria-label="프로젝트">
+    <div class="phead">
+      <div>
+        <div class="eyebrow" id="p-eyebrow">프로젝트</div>
+        <h1 id="p-name"></h1>
+        <div class="pmeta" id="p-meta"></div>
+      </div>
+      <div class="toolbar"><div class="btns" id="p-btns"><button type="button" id="p-edit">정보 수정</button><button type="button" id="p-del">프로젝트 삭제</button></div></div>
+    </div>
+    <div class="cols" id="setup-cols">
+    <section class="card" id="setup" aria-label="공정 데이터 입력">
+      <h2>공정 데이터 입력</h2>
+      <p class="muted" style="margin:0">PFD(Mass Balance 포함), P&amp;ID, Mass Balance 엑셀·문서를 올리면 공정 흐름도와 Equipment List를 만들고, 이 프로젝트의 실적 기록으로 저장합니다.</p>
       <div class="drop" id="drop">
         <button type="button" class="primary" id="pick">파일 선택</button>
         <input type="file" id="file" multiple accept=".pdf,.xlsx,.docx" hidden>
@@ -229,77 +367,124 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
       <div class="row">
         <button type="button" class="primary" id="gen" disabled>흐름도 생성</button>
         <button type="button" id="stop" hidden>중지</button>
-        <span class="muted" id="gen-note">원료에서 제품까지의 메인 흐름(Main Stream)을 먼저 만들고, 적은 계통은 별도 탭으로 만듭니다. 생성 단계에서 Claude를 부르며, 처음 한 번 사용 동의를 묻습니다.</span>
+        <span class="muted" id="gen-note">원료에서 제품까지의 메인 흐름(Main Stream)을 먼저 만들고, 적은 계통은 별도 탭으로 만듭니다. 끝나면 설비·라인 설명을 쓰고 이 프로젝트에 자동 저장합니다. 생성 단계에서 Claude를 부르며, 처음 한 번 사용 동의를 묻습니다.</span>
       </div>
       <ol class="steps" id="steps"></ol>
       <div class="msg" id="msg"></div>
     </section>
 
-    <section class="card saved" id="saved" aria-label="저장된 흐름도">
-      <h2>저장된 흐름도</h2>
+    <section class="card saved" id="saved" aria-label="이 프로젝트의 실적 기록">
+      <h2>실적 기록 <span class="muted" id="rec-count"></span></h2>
       <ul id="saved-list"><li class="muted">불러오는 중…</li></ul>
       <div class="row">
-        <button type="button" id="open-json">JSON 파일 열기</button>
-        <input type="file" id="json-file" accept=".json,application/json" hidden>
-        <button type="button" id="demo">예시 보기 (가상)</button>
-        <button type="button" class="primary" id="sample" hidden>실적 샘플 보기</button>
+        <button type="button" id="import-json">JSON 가져오기</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
       </div>
-      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다. "예시 보기"는 기능 확인용 가상 데이터입니다.</p>
-      <p class="muted" id="sample-note" hidden style="margin:0"></p>
+      <p class="muted" style="margin:0">흐름도를 생성하면 기록이 자동으로 쌓입니다. 기록을 열 때는 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 가져올 수 있습니다.</p>
     </section>
-  </div>
-
-  <section class="card" id="eq" hidden aria-label="Equipment List">
-    <div class="eqhead">
-      <div class="t">
-        <div class="ring" id="eq-ring" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Equipment List 만드는 중">
-          <svg viewBox="0 0 72 72" aria-hidden="true"><circle class="trk" cx="36" cy="36" r="33"/><circle class="arc" cx="36" cy="36" r="33"/></svg>
-          <div class="pie"></div><div class="pct"><span id="eq-pct">0%</span></div>
-        </div>
-        <div class="eqstage"><h2>Equipment List</h2><span class="muted" id="eq-stage">PDF를 올리면 자동으로 만듭니다.</span></div>
-      </div>
-      <div class="eqtools">
-        <input type="search" id="eq-q" placeholder="Tag·이름 찾기" aria-label="Equipment List에서 찾기">
-        <button type="button" id="eq-vis" disabled title="글자 없이 그림으로만 그려진 설비를 Claude가 도면 이미지로 찾습니다. 시트당 Claude 1회">그림으로 설비 찾기</button>
-        <button type="button" id="eq-vis-stop" hidden>중지</button>
-        <button type="button" class="primary" id="eq-xlsx" disabled>Excel로 내려받기</button>
-      </div>
     </div>
-    <div class="eqcounts" id="eq-counts"></div>
-    <div class="eqwrap" id="eq-wrap" tabindex="-1"><table class="eqt" id="eq-tbl"></table></div>
-    <p class="muted" style="margin:0">행을 두 번 누르거나(키보드는 Enter) 하면 그 설비가 있는 PFD를 새 창으로 열고 위치를 빨간 상자로 표시합니다. 노란 행은 Tag 없이 그려진 설비 후보(미확인)입니다. "그림으로 설비 찾기"는 글자 없이 기호로만 그려진 설비를 Claude가 도면 이미지로 찾아 미확인 후보에 더합니다(시트당 1회). 도면 구역은 도면 테두리 격자(행 A–G, 열 1–10)입니다.</p>
+
+    <section class="card" id="eq" hidden aria-label="Equipment List">
+      <div class="eqhead">
+        <div class="t">
+          <div class="ring" id="eq-ring" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Equipment List 만드는 중">
+            <svg viewBox="0 0 72 72" aria-hidden="true"><circle class="trk" cx="36" cy="36" r="33"/><circle class="arc" cx="36" cy="36" r="33"/></svg>
+            <div class="pie"></div><div class="pct"><span id="eq-pct">0%</span></div>
+          </div>
+          <div class="eqstage"><h2>Equipment List</h2><span class="muted" id="eq-stage">PDF를 올리면 자동으로 만듭니다.</span></div>
+        </div>
+        <div class="eqtools">
+          <input type="search" id="eq-q" placeholder="Tag·이름 찾기" aria-label="Equipment List에서 찾기">
+          <button type="button" id="eq-vis" disabled title="글자 없이 그림으로만 그려진 설비를 Claude가 도면 이미지로 찾습니다. 시트당 Claude 1회">그림으로 설비 찾기</button>
+          <button type="button" id="eq-vis-stop" hidden>중지</button>
+          <button type="button" class="primary" id="eq-xlsx" disabled>Excel로 내려받기</button>
+        </div>
+      </div>
+      <div class="eqcounts" id="eq-counts"></div>
+      <div class="eqwrap" id="eq-wrap" tabindex="-1"><table class="eqt" id="eq-tbl"></table></div>
+      <p class="muted" style="margin:0">행을 두 번 누르거나(키보드는 Enter) 하면 그 설비가 있는 PFD를 새 창으로 열고 위치를 빨간 상자로 표시합니다. 노란 행은 Tag 없이 그려진 설비 후보(미확인)입니다. "그림으로 설비 찾기"는 글자 없이 기호로만 그려진 설비를 Claude가 도면 이미지로 찾아 미확인 후보에 더합니다(시트당 1회). 도면 구역은 도면 테두리 격자(행 A–G, 열 1–10)입니다.</p>
+    </section>
+
+    <section id="result" hidden aria-label="흐름도">
+      <div class="toolbar">
+        <div class="muted" id="r-status"></div>
+        <div class="btns">
+          <span class="addsys"><input type="text" id="r-sys" placeholder="계통 탭 추가 (예: 스팀·응축수)" aria-label="추가할 계통"><button type="button" id="r-add" disabled>탭 추가</button></span>
+          <button type="button" id="r-new">새 데이터 입력</button>
+          <button type="button" id="r-save">기록 저장</button>
+          <button type="button" id="r-dl">JSON 내려받기</button>
+        </div>
+      </div>
+      <div class="tabs" role="tablist" id="r-tabs" aria-label="계통"></div>
+      <div class="vhead">
+        <div>
+          <div class="eyebrow" id="v-eyebrow"></div>
+          <h1 id="v-title"></h1>
+          <p class="lede" id="v-lede"></p>
+        </div>
+        <div class="legend" id="v-legend" aria-label="범례"></div>
+      </div>
+      <section class="balance" id="v-balance" aria-label="물질수지 검증"></section>
+      <details class="sheets" id="v-sheets" hidden><summary id="v-sheets-sum"></summary><div class="tblwrap" style="margin-top:8px"><table class="tbl" id="v-sheets-tbl"></table></div></details>
+      <div class="main">
+        <div class="sheet">
+          <svg id="dia" role="img"><defs id="defs"><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs><rect id="gridbg" x="0" y="0" fill="url(#grid)"/><g id="g-frames"></g><g id="g-lines"></g><g id="g-nodes"></g></svg>
+          <div class="hint" id="v-hint"></div>
+        </div>
+        <aside class="detail" id="panel" aria-label="상세설명">
+          <div class="d-head">
+            <div class="r"><h2>상세설명 <span class="muted" id="d-count"></span></h2>
+              <div class="seg" role="group" aria-label="보기"><button type="button" data-f="all" aria-pressed="true">전체</button><button type="button" data-f="n" aria-pressed="false">설비</button><button type="button" data-f="s" aria-pressed="false">라인</button></div></div>
+            <div class="r"><input type="search" id="d-q" placeholder="Tag·번호·이름 찾기" aria-label="상세설명에서 찾기"><button type="button" id="d-desc" hidden title="설비와 라인마다 역할 설명을 Claude가 씁니다. Claude 1회">설명 작성</button></div>
+            <div class="muted" id="d-desc-st" aria-live="polite" hidden></div>
+          </div>
+          <div class="d-body" id="d-body" tabindex="0" aria-label="설비·라인 상세설명 목록"></div>
+        </aside>
+      </div>
+    </section>
   </section>
 
-  <section id="result" hidden aria-label="흐름도">
-    <div class="toolbar">
-      <div class="muted" id="r-status"></div>
-      <div class="btns">
-        <span class="addsys"><input type="text" id="r-sys" placeholder="계통 탭 추가 (예: 스팀·응축수)" aria-label="추가할 계통"><button type="button" id="r-add" disabled>탭 추가</button></span>
-        <button type="button" id="r-new">새로 만들기</button>
-        <button type="button" id="r-save">저장</button>
-        <button type="button" id="r-dl">JSON 내려받기</button>
-      </div>
-    </div>
-    <div class="tabs" role="tablist" id="r-tabs" aria-label="계통"></div>
-    <div class="vhead">
-      <div>
-        <div class="eyebrow" id="v-eyebrow"></div>
-        <h1 id="v-title"></h1>
-        <p class="lede" id="v-lede"></p>
-      </div>
-      <div class="legend" id="v-legend" aria-label="범례"></div>
-    </div>
-    <section class="balance" id="v-balance" aria-label="물질수지 검증"></section>
-    <details class="sheets" id="v-sheets" hidden><summary id="v-sheets-sum"></summary><div class="tblwrap" style="margin-top:8px"><table class="tbl" id="v-sheets-tbl"></table></div></details>
-    <div class="main">
-      <div class="sheet">
-        <svg id="dia" role="img"><defs id="defs"><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern></defs><rect id="gridbg" x="0" y="0" fill="url(#grid)"/><g id="g-frames"></g><g id="g-lines"></g><g id="g-nodes"></g></svg>
-        <div class="hint" id="v-hint"></div>
-      </div>
-      <aside class="panel" id="panel" aria-live="polite"></aside>
+  <section class="screen" id="estimate" hidden aria-label="투자비 산출">
+    <header>
+      <div class="eyebrow">02 · 투자비 산출</div>
+      <h1>투자비 산출</h1>
+      <p class="lede">산출할 프로젝트의 PFD(Mass Balance 포함)를 넣으면 쌓인 실적과 비교해 투자비를 뽑는 화면입니다. 다음 단계에서 구현합니다.</p>
+    </header>
+    <div class="cols">
+      <section class="card" aria-label="쌓인 실적">
+        <h2>쌓인 실적</h2>
+        <div class="summary" id="est-sum"></div>
+        <div class="tblwrap"><table class="tbl" id="est-tbl"></table></div>
+      </section>
+      <section class="card" aria-label="구현 예정">
+        <h2>구현 예정 흐름</h2>
+        <ol class="estlist">
+          <li>산출할 프로젝트의 PFD·Mass Balance 입력</li>
+          <li>흐름도와 Equipment List 자동 생성 (실적 입력과 같은 방식)</li>
+          <li>쌓인 실적에서 비교할 프로젝트 선택, 설비·용량 대응</li>
+          <li>투자비 산출과 근거표 내려받기</li>
+        </ol>
+        <button type="button" id="est-rec">실적 입력으로 가기</button>
+      </section>
     </div>
   </section>
 </div>
+
+<dialog id="pdlg" aria-labelledby="pdlg-t">
+  <form class="dform" id="pform" method="dialog">
+    <h2 id="pdlg-t">새 프로젝트</h2>
+    <div class="field"><label for="pf-name">프로젝트명 (필수)</label><input type="text" id="pf-name" required maxlength="120" autocomplete="off"></div>
+    <div class="f2">
+      <div class="field"><label for="pf-product">제품</label><input type="text" id="pf-product" maxlength="80" placeholder="예: 탄산리튬" autocomplete="off"></div>
+      <div class="field"><label for="pf-cap">생산 능력</label><input type="text" id="pf-cap" maxlength="80" placeholder="예: 25,000 t/y" autocomplete="off"></div>
+      <div class="field"><label for="pf-site">위치</label><input type="text" id="pf-site" maxlength="80" placeholder="국가·지역" autocomplete="off"></div>
+      <div class="field"><label for="pf-year">기준 연도</label><input type="text" id="pf-year" maxlength="20" inputmode="numeric" placeholder="예: 2026" autocomplete="off"></div>
+    </div>
+    <div class="field"><label for="pf-memo">메모</label><textarea id="pf-memo" maxlength="1000"></textarea></div>
+    <div class="msg bad" id="pf-msg" aria-live="polite"></div>
+    <div class="row" style="justify-content:flex-end"><button type="button" id="pf-cancel">취소</button><button type="submit" class="primary" id="pf-ok">만들기</button></div>
+  </form>
+</dialog>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
 <script id="sample-data" type="application/json">__SAMPLE_DATA__</script>
@@ -810,13 +995,70 @@ function tablePrompt(sh, ids, nImg) {
 {"rows":[{"label":"BALANCE FLOW","unit":""},{"label":"Daily Mass Flow","unit":"t/d"}],"columns":[{"stream":"980","description":"Saturated steam to ...","values":["-","132"]}],"notFound":["999"]}`;
 }
 
+/* Plain-language role of every equipment and line, written from the drawn data (text only; nodes and lines go in
+   separate calls when the flow is large, so a long answer is never cut off). */
+function descPrompt(D, part) {
+  const ST = D.streams || {}, NI = D.nodeInfo || {}, M = D.meta || {}, CATS = D.categories || {};
+  const val = (v, f, u) => v && !dash(v[f]) ? `${v[f]} ${u}` : '';
+  const nodes = part.nodes.map(id => { const n = NI[id]; return `${id} | ${n.title} | ${n.tags || ''} | ${(n.info || []).join(' ').slice(0, 160)} | 연결: ${(n.links || []).map(k => ST[k] ? `${ST[k].label || k} ${ST[k].ko || ''}`.trim() : k).join(', ')}`; });
+  const streams = part.streams.map(id => { const s = ST[id], v = s.v || {};
+    const vals = [val(v, 'nm', 't/h'), val(v, 'T', '°C'), val(v, 'P', 'bar(a)'), val(v, 'sol', '% solids'), val(v, 'li', 'ppm Li')].concat((s.comp || []).filter(r => !dash(r[1])).slice(0, 4).map(r => `${r[0]} ${r[1]}${r[2] || '%'}`)).filter(Boolean);
+    return `${id} | 번호 ${s.label || id} | ${s.ko || ''} | ${s.en || ''} | ${CATS[s.cat] ? CATS[s.cat].label : s.cat || ''} | ${s.from || '-'} → ${s.to || '-'} | ${vals.join(', ')}`; });
+  return `[[DESCRIBE]]
+너는 공정 설계 엔지니어다. 아래는 PFD에서 만든 공정 흐름도 "${M.title || ''}"의 ${nodes.length ? '설비' : ''}${nodes.length && streams.length ? '와 ' : ''}${streams.length ? '라인(Stream)' : ''} 목록이다. ${M.lede || ''}
+항목마다 이 공정에서 하는 역할을 한국어 1~2문장으로 설명한다. 공정 실적 자료로 쌓아 나중에 투자비 산출에 참고한다.
+
+규칙
+- 목록에 있는 정보(이름, Tag, 연결, 유량·온도·압력·성분)를 근거로 쓴다. 숫자는 목록에 있는 것만 인용하고 지어내지 않는다.
+- 설비: 무엇을 받아 무엇을 하고 어디로 보내는지. 설비 종류(펌프, 탱크, 반응조, 필터 등)는 Tag 약어와 이름으로 판단한다.
+- 라인: 무엇이 어디서 어디로 가는지와 공정상 의미(원료, 재순환, 시약, 폐기, 제품 등).
+- 배터리 리밋(BL:)이나 시트 밖 연결은 무엇이 들어오고 나가는 경계인지 한 문장.
+- 확실하지 않으면 "~로 보인다"처럼 쓴다.
+
+출력은 JSON 하나만. 키는 목록 첫 열 그대로:
+{"nodes":{"4300-RX-002":"…"},"streams":{"422":"…"}}
+${nodes.length ? `\n## 설비 (키 | 이름 | Tag·시트 | 메모 | 연결 Stream)\n${nodes.join('\n')}\n` : ''}${streams.length ? `\n## 라인 (키 | 번호 | 이름 | 영문 설명 | 종류 | From → To | 값)\n${streams.join('\n')}` : ''}`;
+}
+async function describeFlow(D, signal) {
+  const nodes = Object.keys(D.nodeInfo || {}).slice(0, 200), streams = Object.keys(D.streams || {}).filter(k => !D.streams[k].info).slice(0, 200);
+  const parts = nodes.length + streams.length > 70 ? [{nodes, streams: []}, {nodes: [], streams}] : [{nodes, streams}];
+  const clean = (o, ok) => Object.fromEntries(Object.entries(o || {}).filter(([k, v]) => ok[k] && typeof v === 'string' && v.trim()).map(([k, v]) => [k, v.trim().slice(0, 600)]));
+  const out = {nodes: {}, streams: {}};
+  for (const part of parts) {
+    if (!part.nodes.length && !part.streams.length) continue;
+    calls++;
+    const r = await SAMPLE.json(descPrompt(D, part), {signal, modelTier: 'default'});
+    Object.assign(out.nodes, clean(r && r.nodes, D.nodeInfo || {})); Object.assign(out.streams, clean(r && r.streams, D.streams || {}));
+  }
+  D.desc = {...out, at: Date.now()};
+  return D.desc;
+}
+const DESC_JOB = {running: false, ctl: null};
+async function describeCurrent() {
+  if (!V || busy()) return;
+  const st = $('#d-desc-st'); st.hidden = false;
+  try {
+    SAMPLE = SAMPLE || (window.claude ? await window.claude.use('sample') : null);
+    if (!SAMPLE) { st.textContent = 'Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다.'; return; }
+    DESC_JOB.running = true; DESC_JOB.ctl = new AbortController(); updateDescButton();
+    st.textContent = '설비·라인 설명을 쓰는 중… (Claude)';
+    const D = V, d = await describeFlow(D, DESC_JOB.ctl.signal);
+    if (V === D) renderViewer(D);
+    const n = Object.keys(d.nodes).length + Object.keys(d.streams).length;
+    st.hidden = false; st.textContent = `설명 ${n}건을 썼습니다.` + (S.project ? ' 기록에 저장합니다.' : ' 둘러보기라 저장되지 않습니다.');
+    DESC_JOB.running = false;
+    if (S.project && S.bundle) await saveRecord();
+  } catch (e) { st.textContent = errText(e); }
+  finally { DESC_JOB.running = false; updateDescButton(); }
+}
+
 /* =====================================================================
    6. Generation pipeline
    ===================================================================== */
 const STEP_DEFS = [
   ['read', '파일 읽기', '브라우저'], ['sheets', '시트 식별·시트 간 연결', '브라우저'], ['scope', '계통 범위 판단', 'Claude'],
   ['topo', '시트 안 연결 해석', 'Claude'], ['values', 'Stream 값 채우기', '브라우저·Claude'], ['check', '물질수지·시트 간 비교', '브라우저'],
-  ['draw', '자동 배치·그리기', '브라우저']];
+  ['draw', '자동 배치·그리기', '브라우저'], ['desc', '설비·라인 설명 작성', 'Claude']];
 const stepState = {};
 function setStep(k, st, det) {
   stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps();
@@ -914,12 +1156,17 @@ async function generate(mode) {
       setStep('read', 'done', `${S.files.filter(f => f.ok).length}개 파일 · ${S.jobLabel} 만드는 중`);
       setStep('sheets', 'done', `${S.sheets.length}장 · 연결 ${S.links.flows.length}건 중 ${S.links.matched}건 양쪽 일치`);
       const D = await buildFlow(job.system, job.main, maxImg);
+      setStep('desc', 'run');
+      try { const d = await describeFlow(D, S.ctl.signal); setStep('desc', 'done', `설비 ${Object.keys(d.nodes).length} · 라인 ${Object.keys(d.streams).length}`); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; setStep('desc', 'fail', errText(e) + ' · 결과 화면의 "설명 작성"으로 다시 할 수 있습니다'); }
       tabs.push({key: job.main ? 'main' : 'sys-' + Date.now() + '-' + tabs.length, label: job.main ? 'Main Stream' : (D.meta.title || job.system), main: job.main, flow: D});
     }
     if (add) { S.bundle.tabs.push(...tabs); S.bundle.active = S.bundle.tabs.length - 1; $('#r-sys').value = ''; }
-    else S.bundle = {kind: 'bundle', title: tabs[0].flow.meta.title, tabs, active: 0};
-    showBundle(S.bundle, false);
-    say(`완료: 탭 ${tabs.length}개 · Claude ${calls}회 호출. 자동 해석 결과이므로 '확인 필요' 표시와 물질수지 경고를 먼저 확인하세요.`);
+    else { S.bundle = {kind: 'bundle', title: tabs[0].flow.meta.title, tabs, active: 0}; S.recordId = null; }
+    await showBundle(S.bundle, false);
+    S.running = false;
+    const saved = S.project ? await saveRecord() : false;
+    say(`완료: 탭 ${tabs.length}개 · Claude ${calls}회 호출.${saved ? ` 프로젝트 "${S.project.name}"에 실적 기록으로 저장했습니다.` : ''} 자동 해석 결과이므로 '확인 필요' 표시와 물질수지 경고를 먼저 확인하세요.`);
   } catch (e) {
     const k = Object.keys(stepState).find(x => stepState[x].st === 'run'); if (k) setStep(k, 'fail');
     if (e && e.code === 'unavailable_here') say('Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다. 시트 확인 결과와 저장된 흐름도 열기는 여기서도 됩니다.', 'warn');
@@ -927,7 +1174,7 @@ async function generate(mode) {
     else if (e && e.code) say(errText(e), e.code === 'cancelled' ? '' : 'bad');
     else { console.error(e); say('생성 중 오류: ' + (e && e.message || e), 'bad'); }
     if (add) $('#r-status').textContent = '탭을 추가하지 못했습니다. 위쪽 진행 상태의 메시지를 확인하세요.';
-  } finally { S.running = false; S.addMode = false; $('#stop').hidden = true; updateGen(); }
+  } finally { S.running = false; S.addMode = false; $('#stop').hidden = true; updateGen(); updateDescButton(); }
 }
 
 /* Merge per-sheet answers into one graph + the viewer data. */
@@ -1151,7 +1398,7 @@ function renderViewer(D) {
   V = D; const M = D.meta || {}, CATS = D.categories || {}, ST = D.streams || {}, NI = D.nodeInfo || {};
   const lab = id => ST[id] ? (ST[id].label || (ST[id].info ? '—' : id)) : id;
   $('#v-eyebrow').textContent = M.eyebrow || ''; $('#v-title').textContent = M.title || ''; $('#v-lede').textContent = M.lede || ''; $('#v-hint').textContent = M.hint || '';
-  document.title = M.docTitle ? M.docTitle : 'PFD 흐름도 만들기';
+  document.title = M.docTitle ? M.docTitle : `${M.title || '흐름도'} · 공정 실적·투자비`;
   let st = document.getElementById('cat-style'); if (!st) { st = document.createElement('style'); st.id = 'cat-style'; document.head.appendChild(st); }
   let lt = '', dk = '', rules = '';
   for (const k in CATS) { const c = CATS[k]; lt += `--c-${k}:${c.light};`; dk += `--c-${k}:${c.dark || c.light};`; rules += `.c-${k}{stroke:var(--c-${k});color:var(--c-${k})}`; if (c.dashed) rules += `.ln.c-${k}{stroke-dasharray:7 4}`; }
@@ -1208,45 +1455,91 @@ function renderViewer(D) {
     rows.forEach(([t, c], i) => { el('text', {x: n.x + 10, y: y0 + i * 17 + 4, class: c}, g).textContent = t; });
     if (NI[n.id]) { g.addEventListener('click', () => selectNode(n.id)); g.addEventListener('keydown', onKey(() => selectNode(n.id))); }
   });
-  // panel
-  const panel = $('#panel');
-  const chipsHTML = cur => { const gs = {}; Object.keys(ST).forEach(k => { if (!ST[k].info) (gs[ST[k].cat] = gs[ST[k].cat] || []).push(k); });
-    return '<div class="chipgroup"><h3>전체 Stream</h3>' + Object.keys(CATS).filter(c => gs[c]).map(c => `<div class="lab">${esc(CATS[c].label)}</div><div class="chips">${gs[c].map(k => `<button type="button" class="c-${c}" data-s="${esc(k)}" aria-pressed="${k === cur}">${esc(lab(k))}</button>`).join('')}</div>`).join('') + '</div>'; };
+  // detail frame: a card for every equipment and every line, in a frame that scrolls on its own beside the diagram
+  const body = $('#d-body'), DESC = D.desc || {};
   const notes = (n, warn) => n && n.length ? `<div class="note${warn ? ' warn' : ''}">${n.map(t => `<p>${esc(t)}</p>`).join('')}</div>` : '';
   const comp = (t, c) => c && c.length && c.some(r => !dash(r[1])) ? `<div><h3>${t}</h3><table class="tbl"><tbody>${c.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[2] || '%')}</td><td class="num">${dash(r[1]) ? '–' : esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : '';
-  function renderStream(id) {
+  const chip = k => ST[k] ? `<button type="button" class="c-${ST[k].cat}" data-s="${esc(k)}">${esc(ST[k].info ? (ST[k].ko || k) : lab(k))}</button>` : '';
+  const descP = t => t ? `<p class="dc-desc">${esc(t)}</p>` : '';
+  function streamCard(id) {
     const s = ST[id], c = s.cat, v = s.v || {};
-    let h = `<div class="p-head"><div class="p-num c-${c}"><b>${esc(lab(id))}</b><span class="pill">${esc(CATS[c] ? CATS[c].label : c)}</span>${s.flag ? `<span class="pill flag">${esc(s.flag)}</span>` : ''}${s.valueSrc === 'image' ? '<span class="pill flag">이미지 판독값</span>' : ''}</div><div class="p-ko">${esc(s.ko || '')}</div>${s.en ? `<div class="p-name">${esc(s.en)}</div>` : ''}</div>`;
-    if (s.from || s.to || (s.sheets && s.sheets.length)) h += `<dl class="route"><dt>From</dt><dd>${esc(s.from || '–')}</dd><dt>To</dt><dd>${esc(s.to || '–')}</dd>${s.sheets && s.sheets.length ? `<dt>시트</dt><dd>${s.sheets.map(esc).join('<br>')}</dd>` : ''}</dl>`;
+    let h = `<button type="button" class="dc-head"><span class="dc-k c-${c}">${esc(lab(id))}</span><span class="dc-t">${esc(s.ko || '')}</span><span class="pill c-${c}">${esc(CATS[c] ? CATS[c].label : c)}</span>${s.flag ? `<span class="pill flag">${esc(s.flag)}</span>` : ''}${s.valueSrc === 'image' ? '<span class="pill flag">이미지 판독값</span>' : ''}${s.en ? `<span class="dc-tag">${esc(s.en)}</span>` : ''}</button>`;
+    h += descP((DESC.streams || {})[id]);
+    if (s.from || s.to) h += `<dl class="route"><dt>From</dt><dd>${esc(s.from || '–')}</dd><dt>To</dt><dd>${esc(s.to || '–')}</dd></dl>`;
     const kpi = s.kpi || (s.v ? KPI_DEFAULT.map(([k, f, u]) => [k, v[f], u]) : null);
     if (kpi) h += `<div class="kpis">${kpi.map(([k, val, u]) => `<div class="kpi"><div class="k">${esc(k)}</div><div class="v">${dash(val) ? '–' : esc(val)}${dash(val) || !u ? '' : `<small>${esc(u)}</small>`}</div></div>`).join('')}</div>`;
+    h += notes(s.note, s.flag || s.valueSrc === 'image');
+    let more = '';
     if (s.v) {
       const fr = FLOW_ROWS.filter(r => !(dash(v[r[1]]) && dash(v[r[2]])));
-      if (fr.length) h += `<div><h3>유량</h3><table class="tbl"><thead><tr><th></th><th>질량</th><th>체적</th></tr></thead><tbody>${fr.map(r => `<tr><td>${r[0]}</td><td class="num">${dash(v[r[1]]) ? '–' : esc(v[r[1]]) + ' ' + (r[3] || 't/h')}</td><td class="num">${dash(v[r[2]]) ? '–' : esc(v[r[2]]) + ' ' + (r[4] || 'm³/h')}</td></tr>`).join('')}</tbody></table></div>`;
+      if (fr.length) more += `<div><h3>유량</h3><table class="tbl"><thead><tr><th></th><th>질량</th><th>체적</th></tr></thead><tbody>${fr.map(r => `<tr><td>${r[0]}</td><td class="num">${dash(v[r[1]]) ? '–' : esc(v[r[1]]) + ' ' + (r[3] || 't/h')}</td><td class="num">${dash(v[r[2]]) ? '–' : esc(v[r[2]]) + ' ' + (r[4] || 'm³/h')}</td></tr>`).join('')}</tbody></table></div>`;
       const pr = PROP_ROWS.filter(r => r[2] !== 'li' || !dash(v.li)).map(r => [r[0], r[1], v[r[2]]]).concat(s.extraProps || []);
-      h += `<div><h3>물성 · 운전값</h3><table class="tbl"><tbody>${pr.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${dash(r[2]) ? '–' : esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+      more += `<div><h3>물성 · 운전값</h3><table class="tbl"><tbody>${pr.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${dash(r[2]) ? '–' : esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
     }
-    if (s.rows) h += `<div><h3>Stream Table</h3><table class="tbl"><tbody>${s.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
+    if (s.rows) more += `<div><h3>Stream Table</h3><table class="tbl"><tbody>${s.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td><td class="num">${esc(r[2])}</td></tr>`).join('')}</tbody></table></div>`;
     const ch = comp('성분 · Liquid (wt%)', s.comp) + comp('성분 · Solids (wt%)', s.compSolids);
-    h += ch || (s.v || s.rows ? `<div class="note"><p>${esc(s.compNote || '도면에 이 라인의 성분 값이 없습니다(전부 –).')}</p></div>` : '');
-    h += notes(s.note, s.flag || s.valueSrc === 'image');
-    if (s.sheet) h += `<div class="src">출처: ${esc(s.sheet)}</div>`;
-    h += chipsHTML(id); panel.innerHTML = h; wire();
+    more += ch || (s.v || s.rows ? `<div class="note"><p>${esc(s.compNote || '도면에 이 라인의 성분 값이 없습니다(전부 –).')}</p></div>` : '');
+    if (s.sheets && s.sheets.length) more += `<dl class="route"><dt>시트</dt><dd>${s.sheets.map(esc).join('<br>')}</dd></dl>`;
+    if (s.sheet) more += `<div class="src">출처: ${esc(s.sheet)}</div>`;
+    if (more) h += `<details><summary>유량·물성·성분 표</summary><div>${more}</div></details>`;
+    const q = [lab(id), id, s.ko, s.en, s.from, s.to].filter(Boolean).join(' ').toLowerCase();
+    return `<article class="dcard" data-kind="s" data-id="${esc(id)}" data-q="${esc(q)}">${h}</article>`;
   }
-  function renderNode(id) {
-    const n = NI[id]; let h = `<div class="p-head"><div class="p-ko big">${esc(n.title)}</div>${n.tags ? `<div class="p-name">${esc(n.tags)}</div>` : ''}</div>`;
+  function nodeCard(id) {
+    const n = NI[id], d = (DESC.nodes || {})[id];
+    let h = `<button type="button" class="dc-head"><span class="dc-t">${esc(n.title)}</span>${n.tags ? `<span class="dc-tag">${esc(n.tags)}</span>` : ''}</button>`;
+    h += descP(d);
     if (n.kpiStreams && n.kpiStreams.length) h += `<div class="kpis">${n.kpiStreams.filter(k => ST[k]).map(k => { const s = ST[k]; return `<div class="kpi c-${s.cat}"><div class="k">${esc(s.short || CATS[s.cat].label)} <button type="button" class="link" data-s="${esc(k)}">${esc(lab(k))}</button></div><div class="v">${dash(s.v && s.v.nm) ? '–' : esc(s.v.nm)}<small>t/h</small></div></div>`; }).join('')}</div>`;
-    if (n.compare) { const C = n.compare; h += `<div><h3>${esc(C.title || '비교')}</h3><div class="tblwrap"><table class="tbl"><thead><tr><th></th><th></th>${C.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${C.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td>${r.slice(2).map(x => `<td class="num">${dash(x) ? '–' : esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${C.foot && C.foot.length ? `<div class="src" style="margin-top:6px">${C.foot.map(esc).join('<br>')}</div>` : ''}</div>`; }
-    h += notes(n.info);
-    if (n.links && n.links.length) h += `<div><h3>연결 Stream</h3><div class="chips">${n.links.filter(k => ST[k]).map(k => `<button type="button" class="c-${ST[k].cat}" data-s="${esc(k)}">${esc(ST[k].info ? (ST[k].ko || k) : lab(k))}</button>`).join('')}</div></div>`;
-    h += chipsHTML(null); panel.innerHTML = h; wire();
+    h += notes((n.info || []).filter(t => t !== d));
+    if (n.links && n.links.length) h += `<div><h3>연결 Stream</h3><div class="chips">${n.links.map(chip).join('')}</div></div>`;
+    if (n.compare) { const C = n.compare; h += `<details><summary>${esc(C.title || '입출구 비교')}</summary><div><div class="tblwrap"><table class="tbl"><thead><tr><th></th><th></th>${C.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${C.rows.map(r => `<tr><td>${esc(r[0])}</td><td class="u">${esc(r[1])}</td>${r.slice(2).map(x => `<td class="num">${dash(x) ? '–' : esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${C.foot && C.foot.length ? `<div class="src">${C.foot.map(esc).join('<br>')}</div>` : ''}</div></details>`; }
+    const q = [id, n.title, n.tags].filter(Boolean).join(' ').toLowerCase();
+    return `<article class="dcard" data-kind="n" data-id="${esc(id)}" data-q="${esc(q)}">${h}</article>`;
   }
-  function wire() { panel.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => select(b.dataset.s))); }
+  const isTag = k => EQ_TAG1.test(k);
+  const nodeIds = Object.keys(NI).sort((a, b) => (!isTag(a)) - (!isTag(b)) || a.localeCompare(b, 'en', {numeric: true}));
+  const catOrder = Object.keys(CATS);
+  const streamIds = Object.keys(ST).filter(k => !ST[k].info).sort((a, b) => catOrder.indexOf(ST[a].cat) - catOrder.indexOf(ST[b].cat) || String(lab(a)).localeCompare(String(lab(b)), 'en', {numeric: true}));
+  body.innerHTML = (nodeIds.length ? `<div class="d-sec" data-sec="n">설비 · ${nodeIds.length}</div>` + nodeIds.map(nodeCard).join('') : '')
+    + (streamIds.length ? `<div class="d-sec" data-sec="s">라인 · ${streamIds.length}</div>` + streamIds.map(streamCard).join('') : '')
+    || '<div class="empty">설비나 라인 정보가 없습니다.</div>';
+  body.scrollTop = 0;
+  const cards = {}; body.querySelectorAll('.dcard').forEach(el => cards[el.dataset.kind + ':' + el.dataset.id] = el);
+  body.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => select(b.dataset.s, true)));
+  body.querySelectorAll('.dc-head').forEach(b => b.addEventListener('click', () => { const el = b.closest('.dcard'); if (el.dataset.kind === 's') select(el.dataset.id, false); else selectNode(el.dataset.id, false); }));
+  applyDetailFilter();
+  function focusCard(key, scroll) {
+    body.querySelectorAll('.dcard.sel').forEach(e => e.classList.remove('sel'));
+    const el = cards[key]; if (!el) return;
+    if (el.hidden) { $('#d-q').value = ''; setDetailFilter('all'); }
+    el.classList.add('sel');
+    if (scroll) {
+      const det = el.querySelector('details'); if (det) det.open = true;
+      const hdr = body.querySelector('.d-sec:not([hidden])'), top = el.offsetTop - (hdr ? hdr.offsetHeight : 0) - 14, smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      body.scrollTo({top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto'});   // only the frame scrolls, the page and diagram stay put
+    }
+  }
   function clearSel() { svg.querySelectorAll('.g-line.sel').forEach(g => g.classList.remove('sel')); }
-  function select(id) { if (!ST[id]) return; clearSel(); svg.classList.add('has-sel'); (groups[id] || groups[ST[id].drawnAs] || []).forEach(g => g.classList.add('sel')); renderStream(id); }
-  function selectNode(id) { clearSel(); const n = NI[id], ids = [...(n.links || []), ...(n.kpiStreams || [])]; if (ids.length) { svg.classList.add('has-sel'); ids.forEach(k => (groups[k] || []).forEach(g => g.classList.add('sel'))); } else svg.classList.remove('has-sel'); renderNode(id); }
-  const start = M.defaultSelect && ST[M.defaultSelect] ? M.defaultSelect : Object.keys(ST).find(k => !ST[k].info);
-  if (start) select(start); else { panel.innerHTML = chipsHTML(null); wire(); }
+  function select(id, scroll = true) { if (!ST[id]) return; clearSel(); svg.classList.add('has-sel'); (groups[id] || groups[ST[id].drawnAs] || []).forEach(g => g.classList.add('sel')); focusCard('s:' + id, scroll); }
+  function selectNode(id, scroll = true) { clearSel(); const n = NI[id], ids = [...(n.links || []), ...(n.kpiStreams || [])]; if (ids.length) { svg.classList.add('has-sel'); ids.forEach(k => (groups[k] || []).forEach(g => g.classList.add('sel'))); } else svg.classList.remove('has-sel'); focusCard('n:' + id, scroll); }
+  svg.classList.remove('has-sel');
+  updateDescButton();
+  if (M.defaultSelect && ST[M.defaultSelect]) select(M.defaultSelect, false);
+}
+/* Detail frame filter (kind + search) and the "설명 작성" button; wired once, applied to the current cards. */
+function setDetailFilter(f) { document.querySelectorAll('#panel .seg [data-f]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === f))); applyDetailFilter(); }
+function applyDetailFilter() {
+  const body = $('#d-body'), on = document.querySelector('#panel .seg [aria-pressed="true"]'), f = on ? on.dataset.f : 'all', q = $('#d-q').value.trim().toLowerCase();
+  let n = 0;
+  body.querySelectorAll('.dcard').forEach(el => { const show = (f === 'all' || el.dataset.kind === f) && (!q || el.dataset.q.includes(q)); el.hidden = !show; if (show) n++; });
+  body.querySelectorAll('.d-sec').forEach(s => { s.hidden = !body.querySelector(`.dcard[data-kind="${s.dataset.sec}"]:not([hidden])`); });
+  $('#d-count').textContent = body.querySelector('.dcard') ? `${n}개` : '';
+}
+function updateDescButton() {
+  const d = V && V.desc, has = !!(d && (Object.keys(d.nodes || {}).length || Object.keys(d.streams || {}).length));
+  $('#d-desc').hidden = !V || !window.claude;
+  $('#d-desc').textContent = has ? '설명 다시 작성' : '설명 작성';
+  $('#d-desc').disabled = S.running || DESC_JOB.running;
 }
 /* A result is a bundle of tabs: the main stream first, other systems after it.
    A plain flow JSON (skill output, older saves) opens as a one-tab bundle. */
@@ -1266,7 +1559,7 @@ async function showBundle(B, fromSaved) {
   if (EQ.rows.length) { linkEquipmentToFlow(); renderEquipment(); }
   const g = tab.flow.meta && tab.flow.meta.generated;
   $('#r-status').textContent = fromSaved ? '저장된 흐름도를 열었습니다. Claude를 부르지 않았습니다.' : (g ? `생성: ${new Date(g.at).toLocaleString('ko-KR')} · Claude ${g.calls}회` : '');
-  $('#r-save').disabled = !DB; updateGen();
+  $('#r-save').disabled = !S.project; updateGen();
   if (!S.tabSwitch) $('#result').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 function showResult(D, fromSaved) { return showBundle(asBundle(D), fromSaved); }
@@ -1287,38 +1580,199 @@ async function switchTab(i) {
 }
 
 /* =====================================================================
-   8. Save / open (db = private per viewer; JSON download/open as fallback)
+   8. Projects and records (db: private per viewer under data/users/<id>; kept in memory when db is unavailable)
+   A record is one generated result (tab bundle + equipment list). Its JSON is split over "part" documents so a
+   large main stream stays under the store's per-document limit; the record document itself is small and listable.
    ===================================================================== */
-let DB = null, UID = null;
+let DB = null, UID = null, storeReady = false;
+const MEM = new Map();
+const col = () => DB.collection('data/users/' + UID);
+const store = {
+  async find(filters, order) {
+    if (!DB) return [...MEM.entries()].map(([id, d]) => ({...JSON.parse(d), id})).filter(x => filters.every(([f, v]) => x[f] === v)).sort((a, b) => (b[order] || 0) - (a[order] || 0));
+    let q = col(); filters.forEach(([f, v]) => { q = q.where(f, '==', v); }); if (order) q = q.orderBy(order, 'desc');
+    return (await q.limit(500).get()).docs.map(d => ({...d.data(), id: d.id}));
+  },
+  async get(id) { if (!DB) return MEM.has(id) ? {...JSON.parse(MEM.get(id)), id} : null; const s = await col().doc(id).get(); return s.exists ? {...s.data(), id} : null; },
+  async set(id, data) { const d = {...data}; delete d.id; if (!DB) { MEM.set(id, JSON.stringify(d)); return; } await col().doc(id).set(d); },
+  async del(id) { if (!DB) { MEM.delete(id); return; } await col().doc(id).delete(); }
+};
+const PART = 60000;   // characters per part document: under 256 KiB even when every character takes 3 bytes
+const P = {list: [], recs: []};
+const stamp = t => new Date(t).toLocaleString('ko-KR');
+const projMeta = p => [p.product, p.capacity, p.site, p.year].filter(Boolean).join(' · ');
 async function initStore() {
   try {
     if (!window.claude) throw 0;
     const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
     if (!db || !user) throw 0; UID = await user.id(); if (!UID) throw 0; DB = db;
-    await refreshSaved();
-  } catch (e) { DB = null; $('#saved-list').innerHTML = '<li class="muted">이 화면에서는 저장 목록을 쓸 수 없습니다. JSON 파일로 내려받아 다시 열 수 있습니다.</li>'; }
+  } catch (e) {
+    DB = null; $('#store-note').hidden = false;
+    $('#store-note').textContent = '이 화면에서는 저장소를 쓸 수 없어 프로젝트와 기록이 이 창을 닫으면 사라집니다. claude.ai에서 열면 본인 계정에 저장됩니다(본인만 보임).';
+  }
+  storeReady = true; await loadProjects(); loadLegacy();
 }
-async function refreshSaved() {
+async function loadProjects() {
+  try { P.list = await store.find([['kind', 'project']], 'updatedAt'); }
+  catch (e) { P.list = []; $('#proj-list').innerHTML = `<div class="empty">프로젝트를 불러오지 못했습니다${e && e.code ? ` (${esc(e.code)})` : ''}.</div>`; return; }
+  renderProjects(); renderHomeStat(); renderEstimate();
+}
+function renderProjects() {
+  const q = $('#proj-q').value.trim().toLowerCase(), xs = P.list.filter(p => !q || [p.name, p.product, p.capacity, p.site, p.year].join(' ').toLowerCase().includes(q));
+  $('#proj-count').textContent = P.list.length ? `${P.list.length}개` : '';
+  $('#proj-list').innerHTML = xs.length ? xs.map(p => `<button type="button" class="proj" data-p="${esc(p.id)}"><span class="t">${esc(p.name)}</span><span class="m">${esc(projMeta(p) || '제품·능력 미입력')}</span><span class="n"><span>기록 <b>${p.records || 0}</b>건</span><span>설비 <b>${p.equipment || 0}</b></span><span>${new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR')}</span></span></button>`).join('')
+    : `<div class="empty" style="grid-column:1/-1">${P.list.length ? '찾는 프로젝트가 없습니다.' : '아직 프로젝트가 없습니다. "새 프로젝트"로 시작하세요.'}</div>`;
+  $('#proj-list').querySelectorAll('[data-p]').forEach(b => b.onclick = () => openProject(P.list.find(p => p.id === b.dataset.p)));
+}
+function renderHomeStat() {
+  const r = P.list.reduce((a, p) => a + (p.records || 0), 0);
+  $('#home-stat').textContent = !storeReady ? '' : P.list.length ? `프로젝트 ${P.list.length}개 · 실적 기록 ${r}건` : '아직 쌓인 실적이 없습니다';
+}
+function renderEstimate() {
+  const recs = P.list.reduce((a, p) => a + (p.records || 0), 0), eqs = P.list.reduce((a, p) => a + (p.equipment || 0), 0);
+  $('#est-sum').innerHTML = [['프로젝트', P.list.length + '개'], ['실적 기록', recs + '건'], ['설비 (프로젝트별 최대 기록 합)', eqs + '건']].map(([k, v]) => `<div class="sum"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  $('#est-tbl').innerHTML = P.list.length ? `<thead><tr><th>프로젝트</th><th style="text-align:left">제품</th><th style="text-align:left">생산 능력</th><th style="text-align:left">위치</th><th>기준 연도</th><th>기록</th><th>설비</th></tr></thead><tbody>${P.list.map(p => `<tr><td>${esc(p.name)}</td><td class="l">${esc(p.product || '–')}</td><td class="l">${esc(p.capacity || '–')}</td><td class="l">${esc(p.site || '–')}</td><td class="num">${esc(p.year || '–')}</td><td class="num">${p.records || 0}</td><td class="num">${p.equipment || 0}</td></tr>`).join('')}</tbody>` : '';
+}
+/* project dialog (new / edit) */
+const PF = {name: 'pf-name', product: 'pf-product', capacity: 'pf-cap', site: 'pf-site', year: 'pf-year', memo: 'pf-memo'};
+let pEditing = null;
+function openProjectDialog(p) {
+  pEditing = p || null; $('#pdlg-t').textContent = p ? '프로젝트 정보 수정' : '새 프로젝트'; $('#pf-ok').textContent = p ? '저장' : '만들기'; $('#pf-msg').textContent = '';
+  for (const k in PF) $('#' + PF[k]).value = p ? (p[k] || '') : '';
+  $('#pdlg').showModal(); $('#pf-name').focus();
+}
+async function submitProject() {
+  const name = $('#pf-name').value.trim(); if (!name) { $('#pf-name').focus(); return; }
+  const now = Date.now(), id = pEditing ? pEditing.id : 'proj-' + now.toString(36);
+  const data = {...(pEditing || {kind: 'project', createdAt: now, records: 0, equipment: 0}), updatedAt: now};
+  for (const k in PF) data[k] = $('#' + PF[k]).value.trim();
+  try { await store.set(id, data); } catch (e) { $('#pf-msg').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : ''); return; }
+  $('#pdlg').close(); const p = {...data, id};
+  await loadProjects();
+  if (pEditing) { S.project = p; renderProjectHead(); } else openProject(p);
+}
+/* screens */
+function go(name) {
+  $('#home').hidden = name !== 'home'; $('#app').hidden = name === 'home';
+  ['records', 'project', 'estimate'].forEach(k => { $('#' + k).hidden = k !== name; });
+  $('#nav-rec').hidden = $('#nav-sep2').hidden = name !== 'project';
+  if (name === 'records') $('#nav-cur').textContent = '실적 입력';
+  if (name === 'estimate') $('#nav-cur').textContent = '투자비 산출';
+  document.title = name === 'records' ? '실적 입력 · 공정 실적·투자비' : name === 'estimate' ? '투자비 산출 · 공정 실적·투자비' : '공정 실적·투자비';
+  window.scrollTo(0, 0);
+}
+function busy() { return S.running || VIS.running || DESC_JOB.running; }
+function leaveWork() {
+  if (!busy()) return true;
+  const t = '작업 중입니다. "중지"를 누르거나 끝난 뒤 이동하세요.';
+  say(t, 'warn'); if (!$('#result').hidden) $('#r-status').textContent = t;
+  (S.project ? $('#msg') : $('#r-status')).scrollIntoView({block: 'center'}); return false;
+}
+function resetWork() {
+  Object.assign(S, {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, recordId: null});
+  Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}});
+  $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
+  Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
+  renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
+}
+function renderProjectHead() {
+  const p = S.project;
+  $('#p-eyebrow').textContent = p ? '프로젝트' : '둘러보기';
+  $('#p-name').textContent = p ? p.name : (S.viewLabel || '둘러보기');
+  $('#p-meta').innerHTML = p ? [['제품', p.product], ['생산 능력', p.capacity], ['위치', p.site], ['기준 연도', p.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (p.memo ? `<span>${esc(p.memo)}</span>` : '')
+    : '<span>프로젝트에 저장되지 않는 보기입니다.</span>';
+  $('#p-btns').hidden = !p; $('#setup-cols').hidden = !p; $('#r-save').hidden = !p; $('#r-new').textContent = p ? '새 데이터 입력' : '실적 입력으로';
+  $('#nav-cur').textContent = p ? p.name : (S.viewLabel || '둘러보기');
+}
+async function openProject(p) {
+  if (!p || !leaveWork()) return;
+  S.project = p; resetWork(); renderProjectHead(); go('project'); await loadRecords();
+}
+async function openView(B, label) {   // demo, real-data sample, a JSON file: shown without a project, never saved
+  if (!leaveWork()) return false;
+  S.project = null; S.viewLabel = label; resetWork(); renderProjectHead(); go('project');
+  await showBundle(B, true); return true;
+}
+/* records of the open project */
+async function loadRecords() {
+  const ul = $('#saved-list'); if (!S.project) return;
+  try { P.recs = await store.find([['kind', 'record'], ['projectId', S.project.id]], 'createdAt'); }
+  catch (e) { ul.innerHTML = '<li class="muted">기록을 불러오지 못했습니다.</li>'; return; }
+  $('#rec-count').textContent = P.recs.length ? `${P.recs.length}건` : '';
+  ul.innerHTML = P.recs.length ? P.recs.map(r => `<li${r.id === S.recordId ? ' aria-current="true"' : ''}><span><span class="t">${esc(r.title)}</span><br><span class="muted">${stamp(r.updatedAt || r.createdAt)} · 탭 ${(r.tabs || []).length || 1}개 · Stream ${r.streams || 0} · 설비 ${r.equipment || 0}${r.files ? ' · ' + esc(r.files) : ''}</span></span><span class="row" style="flex-wrap:nowrap"><button type="button" class="link" data-open="${esc(r.id)}">열기</button><button type="button" class="link" data-del="${esc(r.id)}">삭제</button></span></li>`).join('')
+    : '<li class="muted">아직 기록이 없습니다. 공정 데이터를 올리고 "흐름도 생성"을 누르면 여기에 쌓입니다.</li>';
+  ul.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openRecord(b.dataset.open));
+  ul.querySelectorAll('[data-del]').forEach(b => b.onclick = () => armed(b, () => deleteRecord(b.dataset.del)));
+}
+function armed(b, fn) {   // two-step delete button
+  if (b.dataset.armed) { fn(); return; }
+  const t = b.textContent; b.dataset.armed = '1'; b.textContent = '정말 ' + t;
+  setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = t; } }, 4000);
+}
+const recFiles = () => [...new Set((S.bundle ? S.bundle.tabs : []).flatMap(t => ((t.flow.meta || {}).sheets || []).map(x => x.file)))].join(', ');
+async function syncProject() {   // record count and the largest equipment list onto the project card
+  const p = {...S.project, records: P.recs.length, equipment: Math.max(0, ...P.recs.map(r => r.equipment || 0)), updatedAt: Date.now()};
+  await store.set(p.id, p); S.project = p; await loadProjects();
+}
+async function saveRecord() {
+  if (!S.project || !S.bundle) return false;
+  const E = EQ.rows.length ? {rows: EQ.rows, refsMissing: EQ.refsMissing, areaNames: EQ.areaNames || {},
+    file: EQ.sample ? EQ.sample.file : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => e.file.name).join(', '), sheets: EQ.sample ? EQ.sample.sheets : S.sheets.length} : null;
+  const payload = JSON.stringify({bundle: S.bundle, equipment: E}), n = Math.ceil(payload.length / PART), now = Date.now();
+  const id = S.recordId || 'rec-' + now.toString(36);
+  try {
+    const old = S.recordId ? await store.get(id) : null;
+    for (let i = 0; i < n; i++) await store.set(`part-${id}-${i}`, {kind: 'part', recordId: id, i, data: payload.slice(i * PART, (i + 1) * PART)});
+    for (let i = n; i < ((old && old.parts) || 0); i++) await store.del(`part-${id}-${i}`).catch(() => {});
+    const tabs = S.bundle.tabs.map(t => t.label);
+    await store.set(id, {kind: 'record', projectId: S.project.id, title: S.bundle.title || tabs[0] || '흐름도', createdAt: old ? old.createdAt : now, updatedAt: now, parts: n, size: payload.length, tabs,
+      streams: S.bundle.tabs.reduce((a, t) => a + Object.values(t.flow.streams || {}).filter(s => !s.info).length, 0), equipment: EQ.rows.length, files: recFiles().slice(0, 200)});
+    S.recordId = id; await loadRecords(); await syncProject();
+    $('#r-status').textContent = `프로젝트 "${S.project.name}"에 실적 기록을 저장했습니다 (${stamp(now)}).`;
+    return true;
+  } catch (e) { $('#r-status').textContent = '기록을 저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : '') + '. JSON으로 내려받아 두세요.'; return false; }
+}
+async function openRecord(id) {
+  if (!leaveWork()) return;
+  try {
+    const r = await store.get(id); if (!r) throw new Error('기록이 없습니다');
+    let body = ''; for (let i = 0; i < (r.parts || 0); i++) { const x = await store.get(`part-${id}-${i}`); if (!x) throw new Error('기록 일부가 없습니다'); body += x.data; }
+    const X = JSON.parse(body);
+    resetWork(); S.recordId = id;
+    const E = X.equipment;
+    if (E && E.rows) { Object.assign(EQ, {rows: E.rows, refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label: '저장된 기록', file: E.file, sheets: E.sheets}, state: 'done'}); $('#eq').hidden = false; eqProgress(100, `저장된 기록 · 설비 ${E.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done'); }
+    await showBundle(X.bundle, true); renderEquipment(); loadRecords();
+    $('#r-status').textContent = `기록 "${r.title}"을 열었습니다 (${stamp(r.updatedAt || r.createdAt)}). Claude를 부르지 않았습니다.`;
+  } catch (e) { say('기록을 열지 못했습니다: ' + (e.message || e.code || e), 'bad'); }
+}
+async function deleteRecord(id) {
+  try {
+    const r = await store.get(id);
+    for (let i = 0; i < ((r && r.parts) || 0); i++) await store.del(`part-${id}-${i}`).catch(() => {});
+    await store.del(id);
+    if (S.recordId === id) S.recordId = null;
+    await loadRecords(); await syncProject();
+  } catch (e) { say('기록을 지우지 못했습니다' + (e && e.code ? ` (${e.code})` : ''), 'bad'); }
+}
+async function deleteProject() {
+  if (!S.project || !leaveWork()) return;
+  try {
+    const recs = await store.find([['kind', 'record'], ['projectId', S.project.id]], 'createdAt');
+    for (const r of recs) { for (let i = 0; i < (r.parts || 0); i++) await store.del(`part-${r.id}-${i}`).catch(() => {}); await store.del(r.id); }
+    await store.del(S.project.id);
+  } catch (e) { say('프로젝트를 지우지 못했습니다' + (e && e.code ? ` (${e.code})` : ''), 'bad'); return; }
+  S.project = null; resetWork(); go('records'); loadProjects();
+}
+/* flows saved before projects existed (kind 'flow'): open read-only or delete */
+async function loadLegacy() {
   if (!DB) return;
   try {
-    const q = await DB.collection('data/users/' + UID).orderBy('createdAt', 'desc').limit(30).get();
-    const docs = q.docs.filter(d => (d.data() || {}).kind === 'flow');
-    $('#saved-list').innerHTML = docs.length ? docs.map(d => { const x = d.data(); return `<li><span><span class="t">${esc(x.title)}</span><br><span class="muted">${new Date(x.createdAt).toLocaleString('ko-KR')} · ${esc(x.files || '')}</span></span><span class="row" style="flex-wrap:nowrap"><button type="button" class="link" data-open="${esc(d.id)}">열기</button><button type="button" class="link" data-del="${esc(d.id)}">삭제</button></span></li>`; }).join('')
-      : '<li class="muted">아직 저장한 흐름도가 없습니다. 생성한 뒤 "저장"을 누르면 여기에 남습니다.</li>';
-    $('#saved-list').querySelectorAll('[data-open]').forEach(b => b.onclick = async () => { const s = await DB.collection('data/users/' + UID).doc(b.dataset.open).get(); if (s.exists) showBundle(JSON.parse(s.data().data), true); });
-    $('#saved-list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
-      if (b.dataset.armed) { await DB.collection('data/users/' + UID).doc(b.dataset.del).delete(); refreshSaved(); }
-      else { b.dataset.armed = '1'; b.textContent = '정말 삭제'; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = '삭제'; } }, 4000); } });
-  } catch (e) { $('#saved-list').innerHTML = '<li class="muted">저장 목록을 불러오지 못했습니다.</li>'; }
-}
-async function saveResult() {
-  if (!DB || !S.bundle) return;
-  const body = JSON.stringify(S.bundle);
-  if (body.length > 240000) { $('#r-status').textContent = '흐름도가 너무 커서 저장 목록에 넣지 못했습니다. JSON으로 내려받아 주세요.'; return; }
-  try {
-    await DB.collection('data/users/' + UID).doc('flow-' + Date.now()).set({kind: 'flow', title: S.bundle.title || S.result.meta.title || '흐름도', createdAt: Date.now(), files: S.bundle.tabs.flatMap(t => (t.flow.meta.sheets || []).map(x => x.file)).filter((v, i, a) => a.indexOf(v) === i).join(', ').slice(0, 200), data: body});
-    $('#r-status').textContent = '저장했습니다. 다시 열 때는 Claude를 부르지 않습니다.'; refreshSaved();
-  } catch (e) { $('#r-status').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : '') + '. JSON으로 내려받아 주세요.'; }
+    const xs = await store.find([['kind', 'flow']], 'createdAt');
+    $('#legacy').hidden = !xs.length;
+    $('#legacy-list').innerHTML = xs.map(x => `<li><span><span class="t">${esc(x.title)}</span><br><span class="muted">${stamp(x.createdAt)} · ${esc(x.files || '')}</span></span><span class="row" style="flex-wrap:nowrap"><button type="button" class="link" data-open="${esc(x.id)}">열기</button><button type="button" class="link" data-del="${esc(x.id)}">삭제</button></span></li>`).join('');
+    $('#legacy-list').querySelectorAll('[data-open]').forEach(b => b.onclick = () => { const x = xs.find(y => y.id === b.dataset.open); if (x) openView(JSON.parse(x.data), x.title); });
+    $('#legacy-list').querySelectorAll('[data-del]').forEach(b => b.onclick = () => armed(b, async () => { await store.del(b.dataset.del).catch(() => {}); loadLegacy(); }));
+  } catch (e) { /* the legacy list is optional */ }
 }
 async function downloadResult() {
   if (!S.bundle) return;
@@ -1327,10 +1781,18 @@ async function downloadResult() {
   if (!dl) { $('#r-status').textContent = '이 화면에서는 파일 내려받기를 쓸 수 없습니다.'; return; }
   try { await dl.save({filename: name, data: JSON.stringify(S.bundle.tabs.length === 1 ? S.bundle.tabs[0].flow : S.bundle, null, 1)}); } catch (e) { if (e && e.code !== 'declined') $('#r-status').textContent = '내려받지 못했습니다.'; }
 }
-function openJson(file) {
-  file.text().then(t => { const D = JSON.parse(t); const ok = f => f && f.streams && (f.nodes || f.lines);
-    if (!(D.tabs ? D.tabs.every(x => ok(x.flow)) : ok(D))) throw new Error('흐름도 데이터가 아닙니다'); return showBundle(D, true); })
-    .catch(e => say('JSON을 열지 못했습니다: ' + (e.message || e), 'bad'));
+async function readFlowJson(file) {
+  const D = JSON.parse(await file.text()), ok = f => f && f.streams && (f.nodes || f.lines);
+  if (!(D.tabs ? D.tabs.every(x => ok(x.flow)) : ok(D))) throw new Error('흐름도 데이터가 아닙니다');
+  return D;
+}
+async function openJson(file) {   // view only (no project)
+  try { await openView(await readFlowJson(file), file.name); } catch (e) { $('#store-note').hidden = false; $('#store-note').textContent = 'JSON을 열지 못했습니다: ' + (e.message || e); }
+}
+async function importJson(file) {   // into the open project as a new record
+  if (!leaveWork()) return;
+  try { const D = await readFlowJson(file); resetWork(); await showBundle(D, true); await saveRecord(); }
+  catch (e) { say('JSON을 가져오지 못했습니다: ' + (e.message || e), 'bad'); }
 }
 
 /* =====================================================================
@@ -1726,7 +2188,7 @@ $('#eq-vis-stop').onclick = () => VIS.ctl && VIS.ctl.abort();
 async function openPfd(r) {
   if (!r) return;
   const sh = S.sheets.find(s => s.key === r.sheetKey);
-  if (!sh) { $('#eq-stage').textContent = EQ.sample ? '실적 샘플에는 원본 PDF가 들어 있지 않습니다. 같은 PDF를 올리면 도면을 열 수 있습니다.' : '이 설비의 PFD 파일이 지금 입력에 없습니다.'; return; }
+  if (!sh) { $('#eq-stage').textContent = EQ.sample ? `${EQ.sample.label || '실적 샘플'}에는 원본 PDF가 들어 있지 않습니다. 같은 PDF를 올리면 도면을 열 수 있습니다.` : '이 설비의 PFD 파일이 지금 입력에 없습니다.'; return; }
   const win = (() => { try { return window.open('', '_blank', 'width=1400,height=900'); } catch (e) { return null; } })();
   if (win) win.document.write('<!doctype html><meta charset="utf-8"><title>PFD 여는 중…</title><body style="font:14px system-ui;padding:24px">PFD를 그리는 중입니다…</body>');
   let url;
@@ -1811,7 +2273,7 @@ async function downloadEquipment() {
   const ws3 = XLSX.utils.aoa_to_sheet([['Tag No.', '언급된 시트', '판단'], ...EQ.refsMissing.map(x => [x.tag, x.sheets, x.why])]);
   ws3['!cols'] = [{wch: 15}, {wch: 40}, {wch: 70}]; XLSX.utils.book_append_sheet(wb, ws3, '도면 미포함 설비');
   const basis = [['항목', '기준'],
-    ['입력', EQ.sample ? `실적 샘플: ${EQ.sample.file} (${EQ.sample.sheets}장)` : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
+    ['입력', EQ.sample ? `${EQ.sample.label || '실적 샘플'}: ${EQ.sample.file} (${EQ.sample.sheets}장)` : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
     ['설비 판별', '설비 이름 아래에 단독으로 적힌 Tag(NNNN-XX-NNN, 앞에 WF- 같은 접두가 붙을 수 있음)를 설비로 본다. 괄호·FROM/TO 문구·주석 속 Tag는 다른 시트 설비를 가리키는 참조라 "도면 미포함 설비" 탭에서 따로 본다.'],
     ['이름', '도면 원문 그대로. 이름 하나 아래 Tag가 여럿이면 "PUMP 1/2", "A/B", "2@8" 표기를 Tag 순서대로 나눠 붙였다.'],
     ['운전 구분', '(STAND-BY)·(SPARE)는 묶음의 마지막 Tag(또는 그 표시가 옆에 붙은 Tag)에, (FUTURE)는 묶음 전체에. 표시가 없으면 운전. Tag 없이 이름만 있는 설비 후보는 "미확인".'],
@@ -1849,7 +2311,9 @@ $('#gen').onclick = () => generate('all');
 $('#stop').onclick = () => S.ctl && S.ctl.abort();
 $('#open-json').onclick = () => $('#json-file').click();
 $('#json-file').onchange = e => { if (e.target.files[0]) openJson(e.target.files[0]); e.target.value = ''; };
-$('#demo').onclick = async () => { await showResult(JSON.parse($('#demo-data').textContent), true); $('#r-status').textContent = '예시(가상 데이터)입니다.'; };
+$('#import-json').onclick = () => $('#import-file').click();
+$('#import-file').onchange = e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; };
+$('#demo').onclick = async () => { if (await openView(JSON.parse($('#demo-data').textContent), '예시 (가상 데이터)')) $('#r-status').textContent = '예시(가상 데이터)입니다. 프로젝트에 저장되지 않습니다.'; };
 /* Real-data sample: only in builds made with `build.py --sample` (kept out of the public repository). */
 const SAMPLE_DATA = (() => { try { return JSON.parse($('#sample-data').textContent); } catch (e) { return null; } })();
 if (SAMPLE_DATA && (SAMPLE_DATA.bundle || SAMPLE_DATA.flow)) {
@@ -1858,21 +2322,42 @@ if (SAMPLE_DATA && (SAMPLE_DATA.bundle || SAMPLE_DATA.flow)) {
 }
 $('#sample').onclick = async () => {
   if (!SAMPLE_DATA) return;
+  const label = SAMPLE_DATA.label || '실적 샘플';
+  if (!await openView(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), label)) return;
   const E = SAMPLE_DATA.equipment;
-  if (E && E.rows && !S.sheets.length) {
-    EQ.rows = JSON.parse(JSON.stringify(E.rows)); EQ.refsMissing = E.refsMissing || []; EQ.areaNames = E.areaNames || {};
-    EQ.sample = {file: E.file, sheets: E.sheets}; EQ.state = 'done'; EQ.q = ''; $('#eq-q').value = '';
-    eqProgress(100, `${SAMPLE_DATA.label || '실적 샘플'} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
+  if (E && E.rows) {
+    Object.assign(EQ, {rows: JSON.parse(JSON.stringify(E.rows)), refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label, file: E.file, sheets: E.sheets}, state: 'done'});
+    $('#eq').hidden = false; eqProgress(100, `${label} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
+    linkEquipmentToFlow();
   }
-  await showBundle(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), true);
-  $('#r-status').textContent = `${SAMPLE_DATA.label || '실적 샘플'}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다.`;
   renderEquipment();
+  $('#r-status').textContent = `${label}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다. 프로젝트에 저장되지 않습니다.`;
 };
 $('#r-add').onclick = () => generate('add');
 $('#r-sys').addEventListener('input', updateGen);
 $('#r-sys').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#r-add').disabled) generate('add'); });
-$('#r-new').onclick = () => { $('#result').hidden = true; window.scrollTo({top: 0, behavior: 'smooth'}); };
-$('#r-save').onclick = saveResult;
+$('#r-new').onclick = () => {
+  if (!S.project) { if (leaveWork()) { go('records'); loadProjects(); } return; }
+  $('#result').hidden = true; S.recordId = null; S.bundle = null; S.result = null; V = null; updateGen(); loadRecords();
+  $('#setup').scrollIntoView({behavior: 'smooth', block: 'start'});
+};
+$('#r-save').onclick = saveRecord;
 $('#r-dl').onclick = downloadResult;
-renderSteps(); initStore();
+/* screens */
+$('#go-rec').onclick = () => go('records');
+$('#go-est').onclick = () => { renderEstimate(); go('estimate'); };
+$('#est-rec').onclick = () => go('records');
+$('#nav-home').onclick = () => { if (leaveWork()) { go('home'); renderHomeStat(); } };
+$('#nav-rec').onclick = () => { if (leaveWork()) { go('records'); loadProjects(); } };
+$('#proj-new').onclick = () => openProjectDialog(null);
+$('#proj-q').addEventListener('input', renderProjects);
+$('#p-edit').onclick = () => openProjectDialog(S.project);
+$('#p-del').onclick = () => armed($('#p-del'), deleteProject);
+$('#pf-cancel').onclick = () => $('#pdlg').close();
+$('#pform').addEventListener('submit', e => { e.preventDefault(); submitProject(); });
+/* detail frame */
+document.querySelectorAll('#panel .seg [data-f]').forEach(b => b.onclick = () => setDetailFilter(b.dataset.f));
+$('#d-q').addEventListener('input', applyDetailFilter);
+$('#d-desc').onclick = describeCurrent;
+renderSteps(); go('home'); initStore();
 </script>
