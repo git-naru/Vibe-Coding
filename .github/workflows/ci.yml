@@ -39,3 +39,22 @@ jobs:
         run: python apps/pfd-flow-viewer/check_build.py "$RUNNER_TEMP/app"
       - name: Syntax-check page script
         run: node --check "$RUNNER_TEMP/app/app.js"
+
+  core:
+    name: pfdcore (Python core) against the app's own code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install pfdcore
+        run: pip install -e "core[test]"
+      - name: Install the app's pdf.js and SheetJS for the parity harness
+        run: npm ci --no-audit --no-fund
+        working-directory: core/tests/parity
+      - name: Parity tests
+        run: python -m pytest core/tests -q

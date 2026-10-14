@@ -13,7 +13,8 @@ PFD(Mass Balance 포함)를 읽어 공정 흐름도와 Equipment List를 만들�
 | Claude Code 스킬 `pfd-flow-viewer` | `.claude/skills/pfd-flow-viewer/` | PFD → 흐름도 뷰어(Artifact). Python 스크립트 + 뷰어 템플릿 |
 | HTML 앱 (공정 실적·투자비) | `apps/pfd-flow-viewer/app.html` (단일 파일, 약 3,200줄) | claude.ai Artifact로 게시해 사용 중 |
 | PRD | claude.ai 문서 (링크는 2절) | F1~F50, 전환 계획 포함 |
-| CI | `.github/workflows/ci.yml` | 스킬 스크립트·예제 뷰어, 앱 빌드·문법 검사 |
+| Python 핵심 로직 `pfdcore` | `core/` | PRD 전환 계획 1단계. 앱의 PDF 판독·Equipment List·설비비 매칭·투자비 산출·Excel 내려받기를 옮김. 가상 입력에서 앱 코드와 결과 동일 (`core/README.md`) |
+| CI | `.github/workflows/ci.yml` | 스킬 스크립트·예제 뷰어, 앱 빌드·문법 검사, pfdcore 대조 테스트 |
 
 ## 2. 링크
 
@@ -40,6 +41,10 @@ apps/pfd-flow-viewer/
   app.html                    HTML 앱 원본 (__DEMO_DATA__, __SAMPLE_DATA__ 자리표시)
   build.py                    단일 HTML 빌드: 예제 삽입, --sample 로 비공개 예시 삽입
   check_build.py              CI 검사: 자리표시 치환, sample-data가 null인지, 스크립트 추출
+core/
+  pfdcore/                    Python 패키지: pdf, sheets, streams, equipment, cost, estimate, export, xlsx·ssf(SheetJS 읽기), js(JavaScript 동작)
+  tests/                      앱 코드와 대조하는 테스트, 가상 입력 생성(fixtures.py), 실제 도면 대조 스크립트(compare_app.py)
+  tests/parity/               harness.cjs: app.html 페이지 스크립트를 Node에서 실행 (pdf.js 3.11.174, SheetJS 0.18.5)
 .github/workflows/ci.yml
 README.md                     기능 설명(사용자 관점)
 HANDOVER.md                   이 문서
@@ -93,6 +98,7 @@ python3 apps/pfd-flow-viewer/build.py dist/pfd-flow-app.html                    
 python3 apps/pfd-flow-viewer/build.py dist/app-sample.html --sample sample.json    # 비공개용 (실데이터 예시 포함)
 python3 apps/pfd-flow-viewer/check_build.py dist/app && node --check dist/app/app.js
 python3 .claude/skills/pfd-flow-viewer/scripts/build_viewer.py --strict .claude/skills/pfd-flow-viewer/examples/demo-steam.json dist/demo.html
+python3 -m pytest core/tests                                                      # pfdcore 대조 테스트 (11절 준비 참고)
 ```
 
 게시는 Claude Code에서 Artifact로 올린다. 같은 링크를 갱신하려면 위 URL을 지정해 다시 올린다. 공유 앱에는 반드시 `--sample` 없이 빌드한 파일만 올린다.
@@ -124,19 +130,22 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 | `noscope.js` | 도면 번호 없는 시트: 파일·쪽으로 찾기, 메인 흐름 대체, 오류 문구 |
 | `autolayout.js`, `sample.js` | 자동 배치 겹침·관통 0, 실적 샘플 보기 |
 
+pfdcore 대조 테스트(`core/tests`)는 저장소 안에 있다. 가상 입력만 쓰고, 앱 코드(`app.html` 페이지 스크립트)를 Node에서 직접 실행해 결과를 비교한다. 실제 도면으로는 `python core/tests/compare_app.py 도면.pdf … --cost 설비비.xlsx`를 비공개 자료 폴더에서 돌린다(아무것도 저장하지 않음).
+
 ## 9. 알려진 한계
 
 - 도면 번호는 `…-PFD-…`/`…-PID-…` 형식만 읽는다(다른 형식은 파일·쪽으로 대신 찾음). 스캔 PDF는 읽지 못한다(OCR 없음, PRD F13).
 - 설비 연결은 Claude가 도면 이미지로 추정한다. 도면의 선(벡터)을 직접 읽지 않는다.
 - PDF는 브라우저 메모리에 통째로 올려 읽는다. 크기 제한은 없지만 20MB가 넘는 파일은 경고를 띄우고(`BIG_FILE`), 아주 큰 파일은 탭이 멈출 수 있어 장 단위로 나눠 올리도록 안내한다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
+- pdf.js에 `cMapUrl`을 주지 않아 CMap 파일이 필요한 글꼴(ToUnicode 없는 Adobe-Korea1 등 CJK CID 글꼴, 미리 정의된 인코딩)의 글자가 빠진다. 한글 설비명이 빠질 수 있다. 수정 방법과 다른 두 문제(설비비 Tag 칸의 쉼표 뒤 다른 Area Tag, JSON 내려받기에 Equipment List·설비비가 빠짐)는 `core/README.md` 끝.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
 
 ## 10. 다음 단계
 
 PRD "전환 계획: 사내 웹 서비스" 절을 따른다.
 
-1. 핵심 로직 Python 분리 (PDF 판독, Equipment List, 설비비 매칭, 투자비 계산) + 테스트. 끝 조건: 지금 앱과 같은 입력에서 같은 결과.
+1. 핵심 로직 Python 분리 (PDF 판독, Equipment List, 설비비 매칭, 투자비 계산) + 테스트. 끝 조건: 지금 앱과 같은 입력에서 같은 결과. → `core/pfdcore` 완료, 가상 입력에서 같음. 남은 확인: 실제 도면으로 `compare_app.py`.
 2. DB 설계(PostgreSQL)와 실적 이관 (앱에서 내려받은 JSON 가져오기).
 3. FastAPI 서버 + 지금 화면 연결, 사내 시범 배포.
 4. 정확도 개선: 도면 선 판독, OCR, 사람 수정값 학습, 실적 기반 지수 회귀.
@@ -148,6 +157,6 @@ PRD "전환 계획: 사내 웹 서비스" 절을 따른다.
 1. 준비: Git, Python 3.10+(3.12 권장), Node 20(선택), Chrome/Edge, Claude Code. `pip install pillow openpyxl python-docx`, poppler(`pdftoppm`, `pdftotext`).
 2. 코드 받기: `git clone https://github.com/git-naru/Vibe-Coding.git` (또는 새 저장소를 만들고 이 저장소 내용을 복사).
 3. 스킬: 저장소 안 `.claude/skills/pfd-flow-viewer/`는 그 폴더에서 Claude Code를 열면 자동으로 잡힌다. 다른 프로젝트에서도 쓰려면 `pfd-flow-viewer-skill.zip`(별도 전달)을 `~/.claude/skills/`에 풀어 둔다.
-4. 검사: 6절의 명령 네 줄이 오류 없이 끝나는지 확인.
+4. 검사: `pip install -e "core[test]"`, `(cd core/tests/parity && npm ci)` 후 6절의 명령이 오류 없이 끝나는지 확인.
 5. 비공개 자료: `private-testkit.zip`(실데이터 예시 JSON, 테스트 스크립트, 가짜 Claude, 가상 설비비·물량·단가 파일)은 저장소 밖 폴더에 풀고, 저장소에 넣지 않는다. 테스트에 쓰는 원본 PDF는 따로 보관 중인 파일을 같은 폴더에 둔다.
 6. Claude Code를 저장소 폴더에서 열면 `CLAUDE.md`를 읽고 이 규칙대로 작업한다. 이어서 할 일은 10절 1단계.

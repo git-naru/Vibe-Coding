@@ -1,0 +1,9 @@
+{
+  "name": "pfdcore-parity",
+  "private": true,
+  "description": "Runs the app's own page script in Node so tests can compare it with pfdcore",
+  "dependencies": {
+    "pdfjs-dist": "3.11.174",
+    "xlsx": "0.18.5"
+  }
+}
