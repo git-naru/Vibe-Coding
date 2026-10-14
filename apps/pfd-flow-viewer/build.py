@@ -3,6 +3,7 @@
 
     python3 apps/pfd-flow-viewer/build.py OUT.html [--sample SAMPLE.json]
 
+The Korean pdf.js CMaps in cmaps/ are inlined too, so CID fonts without ToUnicode keep their text.
 --sample inlines a real-data sample ({label, note, flow, equipment}) behind the "실적 샘플 보기" button.
 Real project data stays out of this repository: keep the sample file elsewhere and use it only for
 the private published build.
@@ -11,11 +12,13 @@ Publish OUT.html as a claude.ai Artifact with capabilities
 {"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}.
 """
 import argparse
+import base64
 import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEMO = HERE.parent.parent / ".claude/skills/pfd-flow-viewer/examples/demo-steam.json"
+CMAPS = HERE / "cmaps"   # Korean pdf.js CMaps (pdfjs-dist 3.11.174, Adobe licence in cmaps/LICENSE)
 
 
 def inline(obj):
@@ -29,11 +32,13 @@ def main():
     a = ap.parse_args()
     out = Path(a.out)
     src = (HERE / "app.html").read_text(encoding="utf-8")
-    assert "__DEMO_DATA__" in src and "__SAMPLE_DATA__" in src
+    assert "__DEMO_DATA__" in src and "__SAMPLE_DATA__" in src and "__CMAP_DATA__" in src
     demo = json.loads(DEMO.read_text(encoding="utf-8"))
     sample = json.loads(Path(a.sample).read_text(encoding="utf-8")) if a.sample else None
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(src.replace("__DEMO_DATA__", inline(demo), 1).replace("__SAMPLE_DATA__", inline(sample), 1), encoding="utf-8")
+    cmaps = {f.stem: base64.b64encode(f.read_bytes()).decode() for f in sorted(CMAPS.glob("*.bcmap"))}
+    out.write_text(src.replace("__DEMO_DATA__", inline(demo), 1).replace("__SAMPLE_DATA__", inline(sample), 1)
+                   .replace("__CMAP_DATA__", inline(cmaps), 1), encoding="utf-8")
     print(f"wrote {out} ({out.stat().st_size / 1024:.0f} KB)")
 
 

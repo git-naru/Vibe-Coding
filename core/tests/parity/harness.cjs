@@ -40,11 +40,16 @@ loadScript = async () => {};
 globalThis.__inApp = src => eval(src);`);
 }
 
+// the Korean CMaps build.py inlines into the page's #cmap-data block
+const cmapData = () => JSON.stringify(Object.fromEntries(fs.readdirSync(path.join(path.dirname(APP), 'cmaps')).filter(f => f.endsWith('.bcmap'))
+  .map(f => [f.slice(0, -6), fs.readFileSync(path.join(path.dirname(APP), 'cmaps', f)).toString('base64')])));
+
 function context() {
-  const dom = stub();
+  const stubs = stub();
+  const dom = new Proxy(stubs, {get: (t, k) => k === 'querySelector' ? (s => s === '#cmap-data' ? {textContent: cmapData()} : stubs) : stubs[k]});
   const ctx = {
     console, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
-    URL, Blob, TextDecoder, TextEncoder, AbortController, structuredClone, Intl, Buffer,
+    URL, Blob, TextDecoder, TextEncoder, AbortController, structuredClone, Intl, Buffer, atob, btoa,
     document: dom, navigator: {}, location: dom, matchMedia: () => ({matches: false, addEventListener() {}}),
     pdfjsLib: require('pdfjs-dist/legacy/build/pdf.js'),
     XLSX: require('xlsx'),
@@ -57,9 +62,9 @@ function context() {
   };
   ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
   ctx.pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-  ctx.withCMaps = () => {   // what the app would read if it gave pdf.js its CMap files
+  ctx.withCMaps = () => {   // what the app would read with every pdf.js CMap (not only the Korean ones it carries)
     const get = ctx.pdfjsLib.getDocument, dir = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'cmaps') + path.sep;
-    ctx.pdfjsLib = {...ctx.pdfjsLib, getDocument: o => get({...o, cMapUrl: dir, cMapPacked: true})};
+    ctx.pdfjsLib = {...ctx.pdfjsLib, getDocument: o => get({...o, CMapReaderFactory: undefined, useWorkerFetch: undefined, cMapUrl: dir, cMapPacked: true})};
   };
   return vm.createContext(ctx);
 }

@@ -22,4 +22,4 @@ python -m pytest core/tests   # pip install -e "core[test]", (cd core/tests/pari
 
 ## 지금 진행 중
 
-PRD "전환 계획: 사내 웹 서비스" 1단계 — 핵심 로직을 `core/pfdcore`로 옮겼고, 가상 입력에서는 앱 코드와 결과가 같다(`core/README.md`). 남은 일: 비공개 실제 도면으로 `python core/tests/compare_app.py`를 돌려 차이를 확인. 그다음 2단계(DB 설계·실적 이관). 옮기면서 찾은 앱 문제 세 가지는 `core/README.md` 끝에 있다.
+PRD "전환 계획: 사내 웹 서비스" 1단계 — 핵심 로직을 `core/pfdcore`로 옮겼고, 가상 입력에서는 앱 코드와 결과가 같다(`core/README.md`). 남은 일: 비공개 실제 도면으로 `python core/tests/compare_app.py`를 돌려 차이를 확인. 그다음 2단계(DB 설계·실적 이관). 옮기면서 찾은 앱 문제 중 한글 글자 누락은 고쳤고, 남은 두 가지는 `core/README.md` 끝에 있다.

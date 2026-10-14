@@ -58,10 +58,10 @@ python core/tests/compare_app.py 실제도면1.pdf 실제도면2.pdf --cost 설�
 - 엑셀 표시 형식: General과 흔한 숫자 형식(0, 0.00, #,##0.0, %, 천 단위 나눔, 따옴표 글자)만 SheetJS와 같게 쓴다. 날짜·분수·지수 형식은 General로 쓰고 `ssf.unsupported`에 남긴다. 이 글자는 XLSX Stream Table에만 쓰이고 Equipment List·설비비·투자비 계산은 원래 값으로 한다.
 - `.xls`(구 Excel)는 읽지 않는다. `.xlsx`, `.csv`만 읽는다.
 - PDF: 세로쓰기, 오른쪽→왼쪽 글자, 주석(annotation) 안 이미지, pdf.js가 작은 반복 이미지를 묶는 경우는 재현하지 않는다(시트 `warnings`에 표시).
-- `cmap_fonts="read"`로 CMap 글꼴을 읽을 때 CID→유니코드 표는 pdfminer 것이라 드문 CID에서 pdf.js와 다를 수 있다.
+- CID 글꼴의 CID→유니코드 표는 pdfminer 것이라 드문 CID에서 pdf.js와 다를 수 있다. 앱은 한글 CMap만 갖고 있으므로 기본(`cmap_fonts="app"`)은 그 밖의 CMap이 필요한 글꼴(일본어·중국어)을 앱처럼 버리고, `"read"`는 모두 읽는다.
 
-## 옮기면서 찾은 앱 문제 (앱은 고치지 않았고, pfdcore는 앱과 같게 동작)
+## 옮기면서 찾은 앱 문제 (pfdcore는 앱과 같게 동작)
 
-1. pdf.js에 `cMapUrl`을 주지 않아, CMap 파일이 필요한 글꼴(ToUnicode 없는 Adobe-Korea1/Japan1/GB1/CNS1 CID 글꼴, UniKS-UCS2-H 같은 미리 정의된 인코딩)의 글자가 통째로 빠진다. 한글 설비명이 이런 글꼴이면 Equipment List에 나오지 않는다. 고치려면 `getDocument`에 `cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/', cMapPacked: true`를 넣는다. pfdcore는 `read_pdf(cmap_fonts="read")`로 고친 뒤의 결과를 낸다.
+1. (고침) pdf.js에 CMap을 주지 않아 ToUnicode 없는 한글 CID 글꼴(Adobe-Korea1)·KS 인코딩의 글자가 통째로 빠졌다. 이제 앱이 한글 CMap 24개를 화면에 넣어(`apps/pfd-flow-viewer/cmaps`, `CMapReader`) 읽는다. 일본어·중국어 CID 글꼴은 아직 빠진다.
 2. `expandTags("3200-PU-001~003, 4100-AG-002A/B")`가 쉼표 뒤 `4100`을 번호로 읽어 `3200-PU-4100`을 만들고 `4100-AG-002A/B`를 놓친다. 설비비 목록 Tag 칸에 Area가 다른 Tag를 쉼표로 이어 쓰면 매칭이 틀린다.
 3. "JSON 내려받기"는 흐름도 묶음만 내려받고 Equipment List·설비비·공사물량·산출 선택은 빠진다. 2단계(실적 이관)에는 기록 전체(`{bundle, equipment, qty, est}`)를 내려받는 기능이 필요하다.

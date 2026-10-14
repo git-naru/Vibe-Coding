@@ -85,15 +85,22 @@ def test_stream_values_on_equipment(app_pdf, py_pdf):
 
 @pytest.mark.parametrize("mode", ["app", "read"])
 def test_fonts_needing_cmap_files(tmp_path, mode):
-    """The app gives pdf.js no cMapUrl, so these fonts' text is dropped; "read" is what a fixed app would see."""
+    """The app carries the Korean pdf.js CMaps only: Korean CID fonts keep their text, a Japanese one loses it.
+    "read" is the app with every pdf.js CMap."""
     import fixtures
     p = fixtures.cjk_pdf(tmp_path / "cjk.pdf")
     app = run_app(("withCMaps(); " if mode == "read" else "") + f"const e = fileEntry({jsq(p)}); await readPdf(e); return S.sheets.map(s => s.items);")
     py = pdf.read_pdf(p, cmap_fonts=mode)
     assert_same(app, [s["items"] for s in py], f"items ({mode})")
-    korean = [it["s"] for it in py[0]["items"] if any(ord(c) > 0x3000 for c in it["s"])]
-    assert korean == ([] if mode == "app" else ["급수탱크", "보일러"])
+    cjk = [it["s"] for it in py[0]["items"] if any(ord(c) > 0x3000 for c in it["s"])]
+    assert cjk == (["급수탱크", "보일러"] if mode == "app" else ["급수탱크", "보일러", "ポンプ"])
     assert py[0]["warnings"] == (["cmap-font"] if mode == "app" else [])
+
+
+def test_app_cmaps_are_the_files_it_carries():
+    from pathlib import Path
+    files = {f.stem for f in (Path(__file__).resolve().parents[2] / "apps/pfd-flow-viewer/cmaps").glob("*.bcmap")}
+    assert files == set(pdf.APP_CMAPS) and "Adobe-Korea1-UCS2" in files
 
 
 @pytest.fixture(scope="module")

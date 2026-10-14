@@ -594,6 +594,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
 <script id="sample-data" type="application/json">__SAMPLE_DATA__</script>
+<script id="cmap-data" type="application/json">__CMAP_DATA__</script>
 <script>
 "use strict";
 /* =====================================================================
@@ -624,6 +625,16 @@ async function needPdf() {
   await loadScript(CDN.pdf); await loadScript(CDN.pdfWorker); // worker script on the page = pdf.js runs on the main thread
   pdfjsLib.GlobalWorkerOptions.workerSrc = CDN.pdfWorker;
 }
+/* Korean CMaps travel with the page (build.py inlines apps/pfd-flow-viewer/cmaps). pdf.js needs them for CID fonts
+   without ToUnicode (Adobe-Korea1) and KS encodings; without them the font's text is lost. Other CMaps are not loaded. */
+const CMAPS = (() => { try { return JSON.parse($('#cmap-data').textContent) || {}; } catch (e) { return {}; } })();
+class CMapReader {
+  async fetch({name}) {
+    const b = CMAPS[name]; if (!b) throw new Error(`CMap ${name}은 이 화면에 들어 있지 않습니다`);
+    return {cMapData: Uint8Array.from(atob(b), c => c.charCodeAt(0)), compressionType: pdfjsLib.CMapCompressionType.BINARY};
+  }
+}
+const openPdfDoc = async file => pdfjsLib.getDocument({data: await file.arrayBuffer(), isEvalSupported: false, useSystemFonts: true, CMapReaderFactory: CMapReader, useWorkerFetch: false}).promise;
 /* Parse a number written either with decimal points (1,562.5) or decimal commas (1,06 / 143,61). */
 function numParse(v, decimalComma) {
   if (dash(v)) return NaN;
@@ -819,7 +830,7 @@ let fileSeq = 0;
 
 async function readPdf(entry) {
   await needPdf();
-  const doc = entry.doc || await pdfjsLib.getDocument({data: await entry.file.arrayBuffer(), isEvalSupported: false, useSystemFonts: true}).promise;
+  const doc = entry.doc || await openPdfDoc(entry.file);
   entry.doc = doc; entry.pages = doc.numPages;
   const U = pdfjsLib.Util, O = pdfjsLib.OPS;
   for (let p = 1; p <= doc.numPages; p++) {
@@ -902,7 +913,7 @@ async function addFiles(list) {
     EQ.state = 'run'; $('#eq').hidden = false; eqProgress(0, 'PDF 여는 중…'); renderEquipment();
     try { await needPdf(); } catch (err) { /* reported per file below */ }
     for (const e of todo.filter(x => x.kind === 'pdf')) {
-      try { e.doc = await pdfjsLib.getDocument({data: await e.file.arrayBuffer(), isEvalSupported: false, useSystemFonts: true}).promise; e.pages = e.doc.numPages; EQ.sheetsTotal += e.pages; }
+      try { e.doc = await openPdfDoc(e.file); e.pages = e.doc.numPages; EQ.sheetsTotal += e.pages; }
       catch (err) { /* readPdf retries and reports */ }
     }
     eqProgress(95 * EQ.sheetsDone / Math.max(1, EQ.sheetsTotal), `PFD ${EQ.sheetsTotal}장 · 읽기 시작`);
