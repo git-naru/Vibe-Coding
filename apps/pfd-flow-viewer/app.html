@@ -212,6 +212,25 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .pfdview .stage{position:relative;transform-origin:0 0}
 .pfdview img{display:block;max-width:none}
 .pfdview .hl{position:absolute;border:3px solid #e0301e;border-radius:4px;box-shadow:0 0 0 4px rgba(224,48,30,.25)}
+/* ---- layout / GA drawing with equipment marks ---- */
+.laywrap{position:relative;height:min(62vh,560px);overflow:auto;border:1px solid var(--rule);border-radius:6px;background:#e9ece8}
+.laystage{position:relative;width:100%}
+.laystage img{display:block;width:100%;background:#fff}
+#lay-marks{position:absolute;inset:0}
+.laywait{position:absolute;inset:0;display:grid;place-items:center}
+.lmk{all:unset;box-sizing:border-box;position:absolute;min-width:14px;min-height:10px;border:1.5px solid #1d5fae;background:rgba(29,95,174,.12);border-radius:3px;cursor:pointer}
+.lmk.off{border:1.5px dashed #6b7480;background:transparent}
+.lmk:hover,.lmk:focus-visible{background:rgba(29,95,174,.3);outline:2px solid var(--focus);outline-offset:1px}
+.lmk.sel{border:3px solid #e0301e;background:rgba(224,48,30,.15);box-shadow:0 0 0 4px rgba(224,48,30,.25);z-index:2;animation:lpulse 1.2s ease-in-out 2}
+@keyframes lpulse{50%{box-shadow:0 0 0 10px rgba(224,48,30,.06)}}
+@media (prefers-reduced-motion:reduce){.lmk.sel{animation:none}}
+.layinfo{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px;min-height:1.6em}
+.layinfo b{font-family:var(--f-mono)}
+#lay-sheet{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);max-width:340px}
+.eqt tbody tr.lsel td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.eqt tbody tr.flash td{animation:rowflash 1.6s ease-out}
+@keyframes rowflash{0%,40%{background:color-mix(in srgb,#e0301e 28%,transparent)}}
+.eqt td.lay{color:var(--accent);font-family:var(--f-mono);font-size:12px}
 /* ---- start screen: two halves ---- */
 .home{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .home-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--paper)}
@@ -409,6 +428,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <p class="muted" style="margin:0">흐름도를 생성하면 기록이 자동으로 쌓입니다. 기록을 열 때는 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 가져올 수 있습니다.</p>
     </section>
     </div>
+
+    <section class="card" id="lay" hidden aria-label="Layout · GA 도면">
+      <div class="eqhead">
+        <div class="eqstage"><h2>Layout · GA</h2><span class="muted" id="lay-st"></span></div>
+        <div class="eqtools">
+          <select id="lay-sheet" aria-label="Layout 도면 고르기"></select>
+          <div class="seg" role="group" aria-label="확대"><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
+        </div>
+      </div>
+      <div class="laywrap" id="lay-wrap"><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
+      <div class="layinfo" id="lay-info" aria-live="polite"></div>
+      <p class="muted" style="margin:0">Layout·GA 도면 글자에서 찾은 설비 Tag를 PFD·P&amp;ID로 만든 Equipment List와 맞춰 표시합니다. 파란 상자는 목록에 있는 설비, 회색 점선은 목록에 없는 Tag입니다. 상자를 누르면 선택되고, 두 번 누르면 Equipment List의 그 설비로 이동합니다. 목록에서 행을 누르면 Layout에서 그 설비가 선택됩니다.</p>
+    </section>
 
     <section class="card" id="eq" hidden aria-label="Equipment List">
       <div class="eqhead">
@@ -782,7 +814,7 @@ function parseXlsxTables(wb) {
 /* =====================================================================
    3. Reading files (browser only)
    ===================================================================== */
-const S = {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, ctl: null, running: false, viewMode: 'pkg'};
+const S = {files: [], sheets: [], layouts: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, ctl: null, running: false, viewMode: 'pkg'};
 let fileSeq = 0;
 
 async function readPdf(entry) {
@@ -831,10 +863,12 @@ async function readPdf(entry) {
     const sh = {key: entry.file.name + ' p' + p, fileId: entry.id, file: entry.file.name, page: p, dwg: own, aliases, title,
                 connectors: conns, badges, items, imgs, textLayer: items.length > 40, textTable, rotate: page.rotate};
     try { sh.grid = sheetGrid(items); sh.area = sheetArea(sh); sh.eq = extractEquipment(sh); } catch (e) { sh.eq = null; console.warn('equipment', sh.key, e); }
-    S.sheets.push(sh);
+    sh.layTitle = ((items.find(it => LAY_TITLE.test(it.s)) || {}).s || '').slice(0, 40);
+    (entry.role ? entry.role === 'layout' : isLayoutSheet(sh, entry.file.name)) ? S.layouts.push(sh) : S.sheets.push(sh);
     EQ.sheetsDone++; eqProgress(95 * EQ.sheetsDone / Math.max(1, EQ.sheetsTotal), `PFD 읽고 설비 찾는 중 · ${EQ.sheetsDone}/${EQ.sheetsTotal}장 (${entry.file.name})`);
     entry.status = `${p}/${doc.numPages}장 읽음`; renderFiles(); await sleep0();
   }
+  entry.note = layNote(entry);
 }
 async function readXlsx(entry) {
   await loadScript(CDN.xlsx);
@@ -862,7 +896,7 @@ async function addFiles(list) {
   renderFiles();
   const big = list.filter(f => f.size > BIG_FILE).length;
   if (big) say(`20MB가 넘는 파일 ${big}개를 읽습니다. 브라우저가 한동안 느려질 수 있고, 멈추면 PDF를 장 단위로 나눠 올리세요.`, 'warn');
-  const todo = S.files.filter(x => x.status === '대기');
+  const todo = S.files.filter(x => x.status === '대기'), before = S.sheets.length, stage0 = $('#eq-stage').textContent;
   if (todo.some(e => e.kind === 'pdf')) {
     // open the PDFs first so the progress ring knows how many sheets are coming
     EQ.state = 'run'; $('#eq').hidden = false; eqProgress(0, 'PDF 여는 중…'); renderEquipment();
@@ -885,7 +919,11 @@ async function addFiles(list) {
   S.links = buildLinks(S.sheets);
   S.docText = S.files.filter(e => e.text).map(e => `# ${e.file.name}\n${e.text}`).join('\n\n').slice(0, 20000);
   renderLocal();
-  if (EQ.state === 'run') finishEquipment();
+  if (EQ.state === 'run') {
+    if (S.sheets.length === before && EQ.sample) { EQ.state = 'done'; eqProgress(100, stage0, 'done'); renderEquipment(); }   // only Layout sheets came in
+    else finishEquipment();
+  }
+  renderLayout(true);
   S.files.filter(e => e.costList && !e.costLoaded).forEach(e => { e.costLoaded = true; loadCostList(e.costList, e.file.name); });
 }
 function finishEquipment() {
@@ -899,30 +937,51 @@ function finishEquipment() {
 }
 function removeFile(id) {
   S.files = S.files.filter(e => e.id !== id);
-  S.sheets = S.sheets.filter(s => s.fileId !== id);
+  S.sheets = S.sheets.filter(s => s.fileId !== id); S.layouts = S.layouts.filter(s => s.fileId !== id);
   S.xlsxTables = S.xlsxTables.filter(t => S.files.some(e => e.file.name === t.file));
+  sheetsChanged();
+}
+function sheetsChanged() {   // after a file is removed or its sheets switch between process sheets and Layout
   S.links = buildLinks(S.sheets); renderFiles(); renderLocal();
-  EQ.sheetsTotal = EQ.sheetsDone = S.sheets.length;
-  if (S.sheets.length) { buildEquipment(); eqProgress(100, `설비 ${EQ.rows.length}건 · PFD ${S.sheets.length}장`, 'done'); } else { EQ.rows = []; EQ.refsMissing = []; }
-  renderEquipment();
+  if (!EQ.sample) {   // a list opened from a record stays; one made from the sheets follows them
+    EQ.sheetsTotal = EQ.sheetsDone = S.sheets.length;
+    if (S.sheets.length) { buildEquipment(); eqProgress(100, `설비 ${EQ.rows.length}건 · PFD ${S.sheets.length}장`, 'done'); } else { EQ.rows = []; EQ.refsMissing = []; }
+  }
+  renderEquipment(); renderLayout(true);
+}
+/* A PDF's sheets are process sheets (PFD, P&ID) or Layout/GA drawings; the file row's button switches them all. */
+const layNote = e => { const n = S.layouts.filter(s => s.fileId === e.id).length; return n ? (n === e.pages ? 'Layout·GA 도면' : `Layout·GA ${n}장`) : ''; };
+function setFileRole(id) {
+  const e = S.files.find(x => x.id === id); if (!e || busy()) return;
+  const mine = sh => sh.fileId === id, all = [...S.sheets.filter(mine), ...S.layouts.filter(mine)];
+  e.role = S.sheets.some(mine) ? 'layout' : 'pfd';
+  S.sheets = S.sheets.filter(sh => !mine(sh)); S.layouts = S.layouts.filter(sh => !mine(sh));
+  (e.role === 'layout' ? S.layouts : S.sheets).push(...all);
+  const order = sh => S.files.findIndex(x => x.id === sh.fileId) * 1e4 + sh.page;
+  S.sheets.sort((a, b) => order(a) - order(b)); S.layouts.sort((a, b) => order(a) - order(b));
+  e.note = [layNote(e), e.big ? '큰 파일' : ''].filter(Boolean).join(' · ');
+  sheetsChanged();
 }
 function renderFiles() {
   const T = $('#files');
   if (!S.files.length) { T.innerHTML = ''; return; }
   T.innerHTML = `<thead><tr><th>파일</th><th>형식</th><th>장/시트</th><th>크기</th><th style="text-align:left">상태</th><th></th></tr></thead><tbody>${S.files.map(e =>
-    `<tr><td class="l" style="overflow-wrap:anywhere">${esc(e.file.name)}</td><td class="num">${esc(e.kind.toUpperCase())}</td><td class="num">${e.pages ?? '–'}</td><td class="num">${kb(e.file.size)}</td><td class="st ${e.bad ? 'bad' : e.warn ? 'warn' : e.ok ? 'ok' : ''}">${esc(e.status)}${e.note ? ' · ' + esc(e.note) : ''}</td><td><button type="button" class="link" data-rm="${e.id}" aria-label="${esc(e.file.name)} 빼기">빼기</button></td></tr>`).join('')}</tbody>`;
+    `<tr><td class="l" style="overflow-wrap:anywhere">${esc(e.file.name)}</td><td class="num">${esc(e.kind.toUpperCase())}</td><td class="num">${e.pages ?? '–'}</td><td class="num">${kb(e.file.size)}</td><td class="st ${e.bad ? 'bad' : e.warn ? 'warn' : e.ok ? 'ok' : ''}">${esc(e.status)}${e.note ? ' · ' + esc(e.note) : ''}</td><td style="white-space:nowrap">${e.kind === 'pdf' && e.pages && !e.bad && /완료/.test(e.status) ? (S.sheets.some(sh => sh.fileId === e.id)
+      ? `<button type="button" class="link" data-role="${e.id}" title="이 파일의 시트를 Layout·GA 도면으로 봅니다">Layout으로</button> `
+      : `<button type="button" class="link" data-role="${e.id}" title="이 파일의 시트를 PFD·P&amp;ID로 봅니다">PFD로</button> `) : ''}<button type="button" class="link" data-rm="${e.id}" aria-label="${esc(e.file.name)} 빼기">빼기</button></td></tr>`).join('')}</tbody>`;
   T.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => removeFile(+b.dataset.rm));
+  T.querySelectorAll('[data-role]').forEach(b => b.onclick = () => setFileRole(+b.dataset.role));
 }
 function renderLocal() {
   const L = S.links, sh = S.sheets;
   const box = $('#local');
-  if (!sh.length && !S.xlsxTables.length) { box.innerHTML = ''; updateGen(); return; }
+  if (!sh.length && !S.xlsxTables.length && !S.layouts.length) { box.innerHTML = ''; updateGen(); return; }
   const noText = sh.filter(s => !s.textLayer).length, imgTables = sh.filter(s => s.imgs.length && !s.textTable).length;
   box.innerHTML = [
     ['시트', sh.length + '장', ''], ['시트 간 연결 확인', L ? `${L.matched}건` : '–', ''],
     ['연결 확인 필요', L ? `${L.issues}건` : '–', L && L.issues ? 'warn' : ''], ['입력에 없는 도면', L ? `${L.missingCount}개` : '–', ''],
     ['표가 이미지인 시트', imgTables + '장', imgTables ? 'warn' : ''], ['XLSX Stream 표', S.xlsxTables.length + '개', ''],
-    ...(noText ? [['텍스트 없는 시트(스캔본)', noText + '장', 'warn']] : [])
+    ...(noText ? [['텍스트 없는 시트(스캔본)', noText + '장', 'warn']] : []), ...(S.layouts.length ? [['Layout·GA 도면', S.layouts.length + '장', '']] : [])
   ].map(([k, v, c]) => `<div class="sum"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
   // suggestions from sheet titles
   const words = new Set();
@@ -1916,11 +1975,12 @@ function leaveWork() {
   (S.project ? $('#msg') : $('#r-status')).scrollIntoView({block: 'center'}); return false;
 }
 function resetWork() {
-  Object.assign(S, {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, recordId: null});
+  Object.assign(S, {files: [], sheets: [], layouts: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, recordId: null});
   Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}, cost: null, costCalc: null, costSig: '', qty: null, est: null, estSig: ''}); EST_CALC = null; $('#qty').hidden = $('#estc').hidden = true; $('#qty-msg').textContent = $('#ec-msg').textContent = ''; $('#cost-msg').textContent = ''; $('#cost-save').textContent = '';
   $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
   Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
+  Object.assign(LAY, {sel: null, sheet: 0, z: 1, idx: null, shown: '', marks: ''}); LAY.img.clear(); $('#lay').hidden = true; $('#lay-img').dataset.k = ''; $('#lay-info').innerHTML = '';
 }
 function renderProjectHead() {
   const p = S.project, X = !p && S.viewProject;
@@ -2339,13 +2399,15 @@ function renderEquipment() {
   const mb = EQ.rows.some(r => r.mb);
   const sig = EQ.rows.length + '|' + (EQ.cost ? JSON.stringify([EQ.cost.edits, EQ.cost.pick, EQ.cost.ai, EQ.cost.list && EQ.cost.list.items.length]) : '');
   if (sig !== EQ.costSig) { EQ.costSig = sig; EQ.costCalc = EQ.cost ? computeCosts() : null; renderCostPanel(); }
+  const lay = S.layouts.length > 0, LX = lay ? layoutIndex() : null;
   const K = EQ.costCalc, cu = EQ.cost && EQ.cost.unit ? ` (${esc(EQ.cost.unit)})` : '', hasList = !!(EQ.cost && EQ.cost.list), showCost = !isEst();
-  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', ...(showCost ? [`설비비${cu}`] : []), ...(hasList && showCost ? ['매칭'] : []), 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
+  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', ...(showCost ? [`설비비${cu}`] : []), ...(hasList && showCost ? ['매칭'] : []), 'Area', 'PFD 도면 번호', '쪽', '구역', ...(lay ? ['Layout'] : []), ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
   const stCls = s => s === '미확인' ? 'st-unk' : s.startsWith('예비') || s.startsWith('향후') ? 'st-sb' : '';
   $('#eq-tbl').innerHTML = `<thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => {
     const i = EQ.rows.indexOf(r);
-    return `<tr tabindex="0" data-i="${i}" class="${r.untagged ? 'unk' : ''}" title="두 번 누르면 PFD를 엽니다"><td class="mono r">${i + 1}</td><td class="mono">${esc(r.tag)}</td><td title="${esc(r.name)}">${esc(r.name)}</td><td>${esc(r.kind)}</td>
-      <td class="${stCls(r.status)}">${esc(r.status)}</td>${!showCost ? '' : (() => { const b = K && K.byKey[eqKey(r)]; return `<td class="cost" data-k="${esc(eqKey(r))}" title="눌러서 설비비 입력${b && b.split ? ` · 목록 1행을 ${b.split}기에 나눔` : ''}">${b ? fmtCost(b.cost) : '–'}</td>${hasList ? `<td class="how${b && (b.how === 'name' || b.how === 'ai') ? ' chk' : ''}">${b ? esc(HOW[b.how] || '') : ''}</td>` : ''}`; })()}<td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>
+    const lk = !r.untagged && lay ? normTag(r.tag) : '', lw = lk && LX.where.get(lk);
+    return `<tr tabindex="0" data-i="${i}" class="${r.untagged ? 'unk' : ''}${lk && lk === LAY.sel ? ' lsel' : ''}" title="${lay ? '누르면 Layout에서 선택, ' : ''}두 번 누르면 PFD를 엽니다"><td class="mono r">${i + 1}</td><td class="mono">${esc(r.tag)}</td><td title="${esc(r.name)}">${esc(r.name)}</td><td>${esc(r.kind)}</td>
+      <td class="${stCls(r.status)}">${esc(r.status)}</td>${!showCost ? '' : (() => { const b = K && K.byKey[eqKey(r)]; return `<td class="cost" data-k="${esc(eqKey(r))}" title="눌러서 설비비 입력${b && b.split ? ` · 목록 1행을 ${b.split}기에 나눔` : ''}">${b ? fmtCost(b.cost) : '–'}</td>${hasList ? `<td class="how${b && (b.how === 'name' || b.how === 'ai') ? ' chk' : ''}">${b ? esc(HOW[b.how] || '') : ''}</td>` : ''}`; })()}<td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>${lay ? `<td class="lay" title="${lw ? 'Layout ' + lw.map(j => j + 1).join('·') + '번 도면에 있음' : 'Layout 도면에서 찾지 못함'}">${lw ? '● ' + lw.map(j => j + 1).join(',') : '–'}</td>` : ''}
       ${mb ? `<td class="mono">${esc(r.mb ? r.mb.basis : '')}</td><td class="mono r">${r.mb && r.mb.dx !== '' ? fmt(+r.mb.dx) : ''}</td><td class="mono r">${esc(r.mb ? r.mb.T : '')}</td><td class="mono r">${esc(r.mb ? r.mb.P : '')}</td>` : ''}
       <td class="flag" title="${esc(rowFlags(r))}">${esc(rowFlags(r))}</td></tr>`; }).join('') || `<tr><td colspan="${head.length}" class="muted">${EQ.state === 'run' ? '읽는 중…' : '설비를 찾지 못했습니다.'}</td></tr>`}</tbody>`;
   $('#eq-xlsx').disabled = !EQ.rows.length || EQ.state === 'run';
@@ -2353,6 +2415,7 @@ function renderEquipment() {
   const left = S.sheets.filter(sh => sh.eq && !sh.eqVision && sh.textLayer).length;
   $('#eq-vis').textContent = !EQ.rows.length || left === S.sheets.length ? '그림으로 설비 찾기' : left ? `그림으로 설비 찾기 (남은 ${left}장)` : '그림 대조 완료';
   if (EQ.rows.length && !left) $('#eq-vis').disabled = true;
+  if (lay) renderLayout();
   afterEquipment();
 }
 let estT = null;
@@ -2454,13 +2517,7 @@ async function openPfd(r) {
   const win = (() => { try { return window.open('', '_blank', 'width=1400,height=900'); } catch (e) { return null; } })();
   if (win) win.document.write('<!doctype html><meta charset="utf-8"><title>PFD 여는 중…</title><body style="font:14px system-ui;padding:24px">PFD를 그리는 중입니다…</body>');
   let url;
-  try {
-    const page = await pageOf(sh), vp1 = page.getViewport({scale: 1}), scale = Math.min(4, 2600 / vp1.width), vp = page.getViewport({scale});
-    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
-    await page.render({canvasContext: ctx, viewport: vp, annotationMode: pdfjsLib.AnnotationMode ? pdfjsLib.AnnotationMode.DISABLE : undefined}).promise;
-    url = c.toDataURL('image/jpeg', 0.9);
-  } catch (e) { if (win) win.close(); say('PFD를 그리지 못했습니다: ' + (e.message || e), 'bad'); return; }
+  try { url = await pageImage(sh, 2600); } catch (e) { if (win) win.close(); say('PFD를 그리지 못했습니다: ' + (e.message || e), 'bad'); return; }
   const title = `${r.tag} · ${r.name}`, sub = `${r.dwg || '도면 번호 없음'} · ${r.file} ${r.page}쪽 · 구역 ${r.zone || '–'}`;
   const pad = 0.012, hb = [Math.max(0, r.box[0] - pad), Math.max(0, r.box[1] - pad * 1.6), Math.min(1, r.box[2] + pad), Math.min(1, r.box[3] + pad * 0.6)];
   if (win && !win.closed) {
@@ -2508,6 +2565,142 @@ function start(){ap();fo()} if(im.complete)start();else im.onload=start;
 <\/script></body></html>`;
 }
 
+async function pageImage(sh, maxW, maxScale = 4) {   // one PDF page as a JPEG data URL, at most maxW pixels wide
+  const page = await pageOf(sh), vp1 = page.getViewport({scale: 1}), vp = page.getViewport({scale: Math.min(maxScale, maxW / vp1.width)});
+  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  await page.render({canvasContext: ctx, viewport: vp, annotationMode: pdfjsLib.AnnotationMode ? pdfjsLib.AnnotationMode.DISABLE : undefined}).promise;
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
+/* ---- Layout / GA drawings: equipment tags on the plan, matched to the list (made from PFD, P&ID) by tag ----
+   A sheet is a Layout when it has no -PFD-/-PID- number or process title and its title block or file name says
+   layout / GA / plot plan; the file row's button overrides that. Not saved with the record (the drawing is not kept). */
+const LAY_TITLE = /GENERAL\s+ARRANGEMENT|PLOT\s+PLAN|LAY-?OUT|EQUIPMENT\s+ARRANGEMENT|ARRANGEMENT\s+(?:PLAN|DRAWING)|배치도/i;
+const LAY_FILE = /lay-?out|plot.?plan|general.?arr|(?:^|[^a-z])ga(?:[^a-z]|$)|배치/i;
+const LAY_NOT = /PROCESS\s+FLOW\s+DIAGRAM|PIPING\s+(?:AND|&)\s+INSTRUMENT|\bP\s*&\s*ID\b|MASS\s+BALANCE|STREAM\s+TABLE/i;
+const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve()};
+function isLayoutSheet(sh, fileName) {
+  if (sh.dwg || sh.title) return false;
+  const block = sh.items.filter(it => it.y0 > 0.7 && it.x0 > 0.5).map(it => it.s).join(' ');
+  if (LAY_NOT.test(block)) return false;
+  return LAY_TITLE.test(block) || LAY_FILE.test(fileName);
+}
+const layoutLabel = sh => `${sh.file} ${sh.page}쪽` + (sh.layTitle ? ` · ${sh.layTitle}` : '');
+function layoutIndex() {   // per Layout sheet: the tags written on it; a tag key → its list rows and the sheets showing it
+  const sig = EQ.rows.length + '#' + S.layouts.map(sh => sh.key).join('|');
+  if (LAY.idx && LAY.idx.rows === EQ.rows && LAY.idx.sig === sig) return LAY.idx;
+  const rowsOf = new Map();
+  EQ.rows.forEach((r, i) => { if (r.untagged) return; const k = normTag(r.tag); rowsOf.has(k) ? rowsOf.get(k).push(i) : rowsOf.set(k, [i]); });
+  const short = new Map();   // "PU-001" written without its area → 4300-PU-001 when only one area has that number
+  for (const k of rowsOf.keys()) { const t = k.slice(5); short.set(t, short.has(t) ? null : k); }
+  const sheets = S.layouts.map(sh => {
+    const marks = [];
+    for (const it of sh.items) {
+      if (it.y0 > 0.83 && it.x0 > 0.6) continue;   // title block: drawing numbers look like tags
+      let keys = expandTags(it.s), how = 'tag';
+      if (!keys.length) { keys = [...it.s.toUpperCase().matchAll(/(?<![\w-])([A-Z]{2,4})-(\d{2,4})([A-Z]?)(?![\w-])/g)].map(m => short.get(`${m[1]}-${pad3(m[2])}${m[3]}`)).filter(Boolean); how = 'short'; }
+      for (const k of keys) {
+        const rows = rowsOf.get(k) || [];
+        if (!rows.length && !EQ_TYPE[(k.match(/^\d{4}-([A-Z]+)-/) || [])[1]]) continue;   // neither listed nor an equipment code
+        marks.push({key: k, rows, how, box: [it.x0, it.y0, it.x1, it.y1]});
+      }
+    }
+    return {sh, marks};
+  });
+  const where = new Map();
+  sheets.forEach((L, j) => L.marks.forEach(m => { const w = where.get(m.key) || []; if (!w.includes(j)) w.push(j); where.set(m.key, w); }));
+  return (LAY.idx = {rows: EQ.rows, sig, sheets, rowsOf, where});
+}
+function renderLayout(force) {
+  const sec = $('#lay'); if (!S.layouts.length) { sec.hidden = true; return; }
+  const X = layoutIndex(); if (LAY.sheet >= X.sheets.length) LAY.sheet = 0;
+  const sig = X.sig + '#' + LAY.sheet; if (!force && sig === LAY.shown && !sec.hidden) return;
+  LAY.shown = sig; sec.hidden = false;
+  const found = [...X.rowsOf.keys()].filter(k => X.where.has(k)).length;
+  const off = new Set(X.sheets.flatMap(L => L.marks.filter(m => !m.rows.length).map(m => m.key))).size;
+  $('#lay-st').textContent = `Layout ${X.sheets.length}장 · ` + (X.rowsOf.size ? `Equipment List Tag ${X.rowsOf.size}개 중 ${found}개 위치 찾음` : 'Equipment List가 아직 없습니다 — PFD·P&ID를 올리면 Tag로 맞춥니다') + (off ? ` · 목록에 없는 Tag ${off}개` : '');
+  $('#lay-sheet').innerHTML = X.sheets.map((L, j) => `<option value="${j}"${j === LAY.sheet ? ' selected' : ''}>${j + 1}. ${esc(layoutLabel(L.sh))} · 설비 ${new Set(L.marks.filter(m => m.rows.length).map(m => m.key)).size}</option>`).join('');
+  $('#lay-sheet').disabled = X.sheets.length < 2;
+  for (const k of LAY.img.keys()) if (!S.layouts.some(sh => sh.key === k)) LAY.img.delete(k);
+  if (LAY.sel) layInfo(LAY.sel);
+  return drawLayout();
+}
+async function drawLayout() {   // the sheet's picture (rendered once per sheet), then its marks; the selection is repainted every time
+  const L = LAY.idx && LAY.idx.sheets[LAY.sheet]; if (!L) return;
+  const img = $('#lay-img'), key = L.sh.key;
+  if (img.dataset.k !== key) {
+    img.dataset.k = key; img.removeAttribute('src'); $('#lay-marks').innerHTML = ''; LAY.marks = '';
+    LAY.pending = (async () => {
+      const wait = $('#lay-wait'); wait.textContent = '도면을 그리는 중…'; wait.hidden = false;
+      let url = LAY.img.get(key);
+      if (!url) {
+        try { url = await pageImage(L.sh, 2400, 3); LAY.img.set(key, url); }
+        catch (e) { if (img.dataset.k === key) wait.textContent = 'Layout 도면을 그리지 못했습니다: ' + (e.message || e); return; }
+      }
+      if (img.dataset.k !== key) return;   // another sheet was picked meanwhile
+      img.alt = layoutLabel(L.sh) + ' Layout 도면'; img.src = url; await img.decode().catch(() => {}); wait.hidden = true;
+    })();
+  }
+  await LAY.pending;
+  if (img.dataset.k !== key) return;
+  const ms = key + '#' + LAY.idx.sig; if (LAY.marks !== ms) { placeMarks(L); LAY.marks = ms; }
+  $('#lay-stage').style.width = LAY.z * 100 + '%';
+  $('#lay-marks').querySelectorAll('.lmk').forEach(b => b.classList.toggle('sel', b.dataset.k === LAY.sel));
+}
+function placeMarks(L) {
+  const pad = 0.0025, pct = v => (v * 100).toFixed(3) + '%';
+  $('#lay-marks').innerHTML = L.marks.map(m => { const r = m.rows.length ? EQ.rows[m.rows[0]] : null, b = m.box, t = m.key + (r ? ' · ' + (r.name || '') : ' · Equipment List에 없음');
+    return `<button type="button" class="lmk${r ? '' : ' off'}" data-k="${esc(m.key)}" style="left:${pct(b[0] - pad)};top:${pct(b[1] - pad)};width:${pct(b[2] - b[0] + 2 * pad)};height:${pct(b[3] - b[1] + 2 * pad)}" aria-label="${esc(t)}" title="${esc(t)}"></button>`; }).join('');
+}
+function layZoom(k, keep) {   // keep: the drawing point [x, y] (0–1) to hold at the centre
+  const w = $('#lay-wrap'), st = $('#lay-stage');
+  const c = keep || [(w.scrollLeft + w.clientWidth / 2) / st.offsetWidth, (w.scrollTop + w.clientHeight / 2) / st.offsetHeight];
+  LAY.z = typeof k === 'number' ? k : k === 'fit' ? 1 : Math.max(1, Math.min(8, LAY.z * (k === '+' ? 1.5 : 1 / 1.5)));
+  st.style.width = LAY.z * 100 + '%';
+  w.scrollLeft = c[0] * st.offsetWidth - w.clientWidth / 2; w.scrollTop = c[1] * st.offsetHeight - w.clientHeight / 2;
+}
+/* Pick an equipment: its marks turn red, its list rows are tinted; from the list, the Layout card shows the right sheet. */
+async function layoutSelect(key, fromList) {
+  const X = layoutIndex(); LAY.sel = key;
+  const w = X.where.get(key) || [];
+  $('#eq-tbl').querySelectorAll('tr[data-i]').forEach(tr => tr.classList.toggle('lsel', (X.rowsOf.get(key) || []).includes(+tr.dataset.i)));
+  layInfo(key);
+  if (w.length && !w.includes(LAY.sheet)) { LAY.sheet = w[0]; await renderLayout(true); } else await drawLayout();
+  const el = $('#lay-marks').querySelector(`.lmk[data-k="${CSS.escape(key)}"]`); if (!el || !fromList) return;
+  const b = X.sheets[LAY.sheet].marks.find(m => m.key === key).box;
+  layZoom(Math.max(LAY.z, 2.5), [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
+  const r = $('#lay-wrap').getBoundingClientRect();
+  if (r.bottom < 60 || r.top > innerHeight - 60) $('#lay-wrap').scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+function layInfo(key) {
+  const X = LAY.idx, box = $('#lay-info'); if (!key || !X) { box.innerHTML = ''; return; }
+  const rows = X.rowsOf.get(key) || [], r = rows.length ? EQ.rows[rows[0]] : null;
+  const marks = X.sheets.flatMap((L, j) => L.marks.filter(m => m.key === key).map(m => ({j, how: m.how})));
+  const at = [...new Set(marks.map(m => m.j + 1))];
+  box.innerHTML = r
+    ? `<b>${esc(r.tag)}</b><span>${esc(r.name || '(이름 미판독)')}</span><span class="muted">${esc([r.kind, r.status, `${short(r.dwg) || r.file} ${r.page}쪽`, r.zone].filter(Boolean).join(' · '))}</span>
+      <span class="muted">${marks.length ? `Layout ${at.length > 1 || X.sheets.length > 1 ? at.join('·') + '번 도면 ' : ''}${marks.length}곳${marks.some(m => m.how === 'short') ? ' (Area 번호 없이 적힌 Tag 포함)' : ''}` : 'Layout 도면에서 찾지 못함'}</span>
+      <button type="button" class="link" data-go>Equipment List에서 보기</button>${S.sheets.some(sh => sh.key === r.sheetKey) ? ' <button type="button" class="link" data-pfd>PFD 열기</button>' : ''}`
+    : `<b>${esc(key)}</b><span class="muted">Equipment List에 없는 Tag입니다 (Layout에만 있음).</span>`;
+  const go = box.querySelector('[data-go]'); if (go) go.onclick = () => gotoRow(key);
+  const pf = box.querySelector('[data-pfd]'); if (pf) pf.onclick = () => openPfd(r);
+}
+function gotoRow(key) {   // the list scrolls to the equipment and flashes its row
+  const rows = layoutIndex().rowsOf.get(key) || [];
+  if (!rows.length) { layInfo(key); return; }
+  if (EQ.q && !$('#eq-tbl').querySelector(`tr[data-i="${rows[0]}"]`)) { EQ.q = ''; $('#eq-q').value = ''; renderEquipment(); }
+  LAY.sel = key;
+  $('#eq-tbl').querySelectorAll('tr[data-i]').forEach(tr => tr.classList.toggle('lsel', rows.includes(+tr.dataset.i)));
+  const tr = $('#eq-tbl').querySelector(`tr[data-i="${rows[0]}"]`); if (!tr) return;
+  tr.scrollIntoView({block: 'center', behavior: 'smooth'}); tr.focus({preventScroll: true});
+  tr.classList.remove('flash'); void tr.offsetWidth; tr.classList.add('flash');
+}
+$('#lay-marks').addEventListener('click', e => { const b = e.target.closest('.lmk'); if (b) layoutSelect(b.dataset.k, false); });
+$('#lay-marks').addEventListener('dblclick', e => { const b = e.target.closest('.lmk'); if (b) gotoRow(b.dataset.k); });
+$('#lay-sheet').addEventListener('change', e => { LAY.sheet = +e.target.value; renderLayout(true); });
+$('#lay').querySelectorAll('[data-z]').forEach(b => b.onclick = () => layZoom(b.dataset.z));
+
 /* ---- Excel ---- */
 async function downloadEquipment() {
   if (!EQ.rows.length) return;
@@ -2516,9 +2709,10 @@ async function downloadEquipment() {
   const K = EQ.costCalc, C = EQ.cost, cu = C && C.unit ? ` (${C.unit})` : '', listRows = it => (it || []).map(i => C.list && C.list.items[i] ? C.list.items[i].row : '').join(', ');
   const costCols = r => { if (!K) return []; const b = K.byKey[eqKey(r)]; return b ? [Math.round(b.cost * 100) / 100, HOW[b.how] + (b.split ? ` (1행을 ${b.split}기에 나눔)` : ''), listRows(b.items)] : ['', '', '']; };
   const head = ['No.', 'Area', 'Tag No.', 'Equipment Name (도면 원문)', '종류', '운전 구분', ...(K ? [`설비비${cu}`, '설비비 매칭', '설비비 목록 행'] : []), '비고 (도면 표기)', 'Nom. Vol. (m³)', 'PFD 도면 번호', 'PDF 파일', 'PDF 쪽', '도면 구역 (행-열)',
-    ...(mb ? ['값 출처 탭', '입구 Stream', '출구 Stream', '기준 Stream', '유체', '일 유량 (t/d)', 'Nominal 평균 (t/h)', 'Design 최대 (t/h)', '운전 온도 (°C)', '운전 압력 (bar)', '밀도 (t/m³)', '고형분 (%)'] : []), '확인 필요'];
+    ...(mb ? ['값 출처 탭', '입구 Stream', '출구 Stream', '기준 Stream', '유체', '일 유량 (t/d)', 'Nominal 평균 (t/h)', 'Design 최대 (t/h)', '운전 온도 (°C)', '운전 압력 (bar)', '밀도 (t/m³)', '고형분 (%)'] : []), ...(S.layouts.length ? ['Layout 위치'] : []), '확인 필요'];
+  const LX = S.layouts.length ? layoutIndex() : null, layAt = r => { const w = !r.untagged && LX.where.get(normTag(r.tag)); return w ? w.map(j => layoutLabel(LX.sheets[j].sh)).join(', ') : ''; };
   const aoa = [head, ...EQ.rows.map((r, i) => [i + 1, r.area, r.tag, r.name, r.kind, r.status, ...costCols(r), r.note, r.vol, r.dwg, r.file, r.page, r.zone,
-    ...(mb ? (r.mb ? [r.mb.tab, r.mb.in, r.mb.out, r.mb.basis, r.mb.fluid, r.mb.dm, r.mb.nm, r.mb.dx, r.mb.T, r.mb.P, r.mb.rho, r.mb.sol] : Array(12).fill('')) : []), rowFlags(r)])];
+    ...(mb ? (r.mb ? [r.mb.tab, r.mb.in, r.mb.out, r.mb.basis, r.mb.fluid, r.mb.dm, r.mb.nm, r.mb.dx, r.mb.T, r.mb.P, r.mb.rho, r.mb.sol] : Array(12).fill('')) : []), ...(LX ? [layAt(r)] : []), rowFlags(r)])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = head.map(h => ({wch: /Name/.test(h) ? 44 : /도면 번호|확인/.test(h) ? 32 : /파일|유체/.test(h) ? 22 : Math.max(8, Math.min(16, h.length + 2))}));
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: aoa.length - 1, c: head.length - 1}})};
@@ -2784,6 +2978,12 @@ $('#cost-unit').addEventListener('change', e => { EQ.cost = EQ.cost || {list: nu
 $('#cost-ai').onclick = costAi;
 $('#cost-clear').onclick = () => armed($('#cost-clear'), () => { if (!EQ.cost) return; EQ.cost = {...EQ.cost, list: null, pick: {}, ai: {}}; costChanged('설비비 목록을 뺐습니다. 직접 입력한 금액은 남겨 두었습니다.'); });
 $('#eq-tbl').addEventListener('click', e => { const td = e.target.closest('td.cost'); if (td) editCost(td); });
+$('#eq-tbl').addEventListener('click', e => {   // a row picks its equipment on the Layout drawing
+  const tr = e.target.closest('tr[data-i]'); if (!tr || !S.layouts.length || e.target.closest('td.cost, input, select, button')) return;
+  const r = EQ.rows[+tr.dataset.i]; if (!r) return;
+  if (r.untagged) { $('#lay-info').textContent = 'Tag가 없는 설비 후보는 Layout 도면과 맞출 수 없습니다.'; return; }
+  layoutSelect(normTag(r.tag), true);
+});
 
 /* =====================================================================
    12. Construction quantities (records) and investment estimate
