@@ -42,7 +42,10 @@ python3 scripts/build_viewer.py examples/demo-steam.json /tmp/demo.html
 
 ```bash
 python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html   # 예시 데이터를 넣어 단일 파일로 빌드
+python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html --sample /path/sample.json   # 비공개 게시용: "실적 샘플 보기" 버튼에 실데이터 결과 포함
 ```
+
+"실적 샘플"(실제 PFD로 만든 흐름도와 Equipment List)은 실데이터라 저장소에 두지 않고 비공개 게시본에만 넣습니다. 저장소 빌드는 이 버튼이 숨겨지며, CI가 샘플이 비어 있는지 확인합니다.
 
 게시 시 capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}`
 

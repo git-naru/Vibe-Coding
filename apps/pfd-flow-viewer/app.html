@@ -234,9 +234,11 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
       <div class="row">
         <button type="button" id="open-json">JSON 파일 열기</button>
         <input type="file" id="json-file" accept=".json,application/json" hidden>
-        <button type="button" id="demo">예시 보기</button>
+        <button type="button" id="demo">예시 보기 (가상)</button>
+        <button type="button" class="primary" id="sample" hidden>실적 샘플 보기</button>
       </div>
-      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다.</p>
+      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다. "예시 보기"는 기능 확인용 가상 데이터입니다.</p>
+      <p class="muted" id="sample-note" hidden style="margin:0"></p>
     </section>
   </div>
 
@@ -291,6 +293,7 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script id="sample-data" type="application/json">__SAMPLE_DATA__</script>
 <script>
 "use strict";
 /* =====================================================================
@@ -1388,7 +1391,7 @@ function buildEquipment() {
       : twin.length ? `Tag 오기로 보임 — 같은 번호의 ${twin.join(', ')}가 도면에 있음` : `${a} Area 도면은 입력에 있는데 설비로 그려져 있지 않음 (문구·주석에만 언급)`;
     return {tag: t, sheets: [...cited[t]].join(', '), why};
   });
-  EQ.rows = rows; EQ.areaNames = areaNames;
+  EQ.rows = rows; EQ.areaNames = areaNames; EQ.sample = null;
   linkEquipmentToFlow();
 }
 
@@ -1552,7 +1555,7 @@ $('#eq-vis-stop').onclick = () => VIS.ctl && VIS.ctl.abort();
 async function openPfd(r) {
   if (!r) return;
   const sh = S.sheets.find(s => s.key === r.sheetKey);
-  if (!sh) { say('이 설비의 PFD 파일이 지금 입력에 없습니다.', 'warn'); return; }
+  if (!sh) { $('#eq-stage').textContent = EQ.sample ? '실적 샘플에는 원본 PDF가 들어 있지 않습니다. 같은 PDF를 올리면 도면을 열 수 있습니다.' : '이 설비의 PFD 파일이 지금 입력에 없습니다.'; return; }
   const win = (() => { try { return window.open('', '_blank', 'width=1400,height=900'); } catch (e) { return null; } })();
   if (win) win.document.write('<!doctype html><meta charset="utf-8"><title>PFD 여는 중…</title><body style="font:14px system-ui;padding:24px">PFD를 그리는 중입니다…</body>');
   let url;
@@ -1637,7 +1640,7 @@ async function downloadEquipment() {
   const ws3 = XLSX.utils.aoa_to_sheet([['Tag No.', '언급된 시트', '판단'], ...EQ.refsMissing.map(x => [x.tag, x.sheets, x.why])]);
   ws3['!cols'] = [{wch: 15}, {wch: 40}, {wch: 70}]; XLSX.utils.book_append_sheet(wb, ws3, '도면 미포함 설비');
   const basis = [['항목', '기준'],
-    ['입력', S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
+    ['입력', EQ.sample ? `실적 샘플: ${EQ.sample.file} (${EQ.sample.sheets}장)` : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
     ['설비 판별', '설비 이름 아래에 단독으로 적힌 Tag(NNNN-XX-NNN, 앞에 WF- 같은 접두가 붙을 수 있음)를 설비로 본다. 괄호·FROM/TO 문구·주석 속 Tag는 다른 시트 설비를 가리키는 참조라 "도면 미포함 설비" 탭에서 따로 본다.'],
     ['이름', '도면 원문 그대로. 이름 하나 아래 Tag가 여럿이면 "PUMP 1/2", "A/B", "2@8" 표기를 Tag 순서대로 나눠 붙였다.'],
     ['운전 구분', '(STAND-BY)·(SPARE)는 묶음의 마지막 Tag(또는 그 표시가 옆에 붙은 Tag)에, (FUTURE)는 묶음 전체에. 표시가 없으면 운전. Tag 없이 이름만 있는 설비 후보는 "미확인".'],
@@ -1676,6 +1679,24 @@ $('#stop').onclick = () => S.ctl && S.ctl.abort();
 $('#open-json').onclick = () => $('#json-file').click();
 $('#json-file').onchange = e => { if (e.target.files[0]) openJson(e.target.files[0]); e.target.value = ''; };
 $('#demo').onclick = () => { S.result = JSON.parse($('#demo-data').textContent); showResult(S.result, true); $('#r-status').textContent = '예시(가상 데이터)입니다.'; };
+/* Real-data sample: only in builds made with `build.py --sample` (kept out of the public repository). */
+const SAMPLE_DATA = (() => { try { return JSON.parse($('#sample-data').textContent); } catch (e) { return null; } })();
+if (SAMPLE_DATA && SAMPLE_DATA.flow) {
+  $('#sample').hidden = false; $('#sample').textContent = (SAMPLE_DATA.label || '실적 샘플') + ' 보기';
+  $('#sample-note').hidden = false; $('#sample-note').textContent = SAMPLE_DATA.note || '';
+}
+$('#sample').onclick = () => {
+  if (!SAMPLE_DATA) return;
+  const E = SAMPLE_DATA.equipment;
+  if (E && E.rows && !S.sheets.length) {
+    EQ.rows = JSON.parse(JSON.stringify(E.rows)); EQ.refsMissing = E.refsMissing || []; EQ.areaNames = E.areaNames || {};
+    EQ.sample = {file: E.file, sheets: E.sheets}; EQ.state = 'done'; EQ.q = ''; $('#eq-q').value = '';
+    eqProgress(100, `${SAMPLE_DATA.label || '실적 샘플'} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
+  }
+  S.result = JSON.parse(JSON.stringify(SAMPLE_DATA.flow)); showResult(S.result, true);
+  $('#r-status').textContent = `${SAMPLE_DATA.label || '실적 샘플'}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다.`;
+  renderEquipment();
+};
 $('#r-new').onclick = () => { $('#result').hidden = true; window.scrollTo({top: 0, behavior: 'smooth'}); };
 $('#r-save').onclick = saveResult;
 $('#r-dl').onclick = downloadResult;
