@@ -1,5 +1,7 @@
 # Vibe-Coding
 
+> 새로 이어받는다면 [`HANDOVER.md`](HANDOVER.md)(인수인계)와 [`CLAUDE.md`](CLAUDE.md)(Claude Code 작업 규칙)부터 읽으세요.
+
 ## PFD Flow Viewer (Claude Code skill)
 
 `.claude/skills/pfd-flow-viewer/` — PFD 도면과 Mass Balance(PDF, XLSX, DOCX)를 읽어 계통별 인터랙티브 흐름도를 만드는 Claude Code 스킬입니다.
