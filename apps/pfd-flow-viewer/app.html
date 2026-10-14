@@ -239,6 +239,8 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .proj .m{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 .proj .n{display:flex;flex-wrap:wrap;gap:4px 12px;font:12px var(--f-mono);color:var(--muted)}
 .proj .n b{color:var(--ink);font-weight:600}
+.proj.ex{border-style:dashed;background:color-mix(in srgb,var(--accent) 5%,var(--paper))}
+.proj .pill{font-size:11px;color:var(--accent);vertical-align:2px}
 .empty{border:1.5px dashed var(--rule);border-radius:6px;padding:24px 16px;text-align:center;color:var(--muted);font-size:13px}
 .side{display:flex;flex-direction:column;gap:16px;min-width:0}
 .phead{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
@@ -353,7 +355,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <h1 id="p-name"></h1>
         <div class="pmeta" id="p-meta"></div>
       </div>
-      <div class="toolbar"><div class="btns" id="p-btns"><button type="button" id="p-edit">정보 수정</button><button type="button" id="p-del">프로젝트 삭제</button></div></div>
+      <div class="toolbar"><button type="button" class="primary" id="p-adopt" hidden>내 실적으로 가져오기</button><div class="btns" id="p-btns"><button type="button" id="p-edit">정보 수정</button><button type="button" id="p-del">프로젝트 삭제</button></div></div>
     </div>
     <div class="cols" id="setup-cols">
     <section class="card" id="setup" aria-label="공정 데이터 입력">
@@ -1361,8 +1363,12 @@ function linksOf(D) {   // stream ends as box ids: links may name tags (hand-mad
   const N = D.nodes || [], ids = new Set(N.map(n => n.id));
   const res = e => ids.has(e) ? e : ((N.find(n => n.sub === e) || N.find(n => n.sub && e && (n.sub.startsWith(e) || e.startsWith(n.sub)))) || {}).id || null;
   let out = (D.links || []).map(l => ({...l, from: res(l.from), to: res(l.to)})).filter(l => l.from && l.to && l.from !== l.to);
-  if (out.length < (D.links || []).length * 0.6) {
-    const near = p => { let best = null, bd = 15; for (const n of N) { const d = Math.hypot(Math.max(n.x - p[0], 0, p[0] - n.x - n.w), Math.max(n.y - p[1], 0, p[1] - n.y - n.h)); if (d < bd) { bd = d; best = n.id; } } return best; };
+  if (!out.length || out.length < (D.links || []).length * 0.6) {
+    const seg = (p, b) => { const dx = b.x2 - b.x1, dy = b.y2 - b.y1, t = Math.max(0, Math.min(1, ((p[0] - b.x1) * dx + (p[1] - b.y1) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(p[0] - b.x1 - t * dx, p[1] - b.y1 - t * dy); };
+    const near = p => { let best = null, bd = 15;
+      for (const n of N) { const d = Math.hypot(Math.max(n.x - p[0], 0, p[0] - n.x - n.w), Math.max(n.y - p[1], 0, p[1] - n.y - n.h)); if (d < bd) { bd = d; best = n.id; } }
+      for (const b of D.bars || []) if (b.node) { const d = seg(p, b); if (d < bd) { bd = d; best = b.node; } }   // header bars of hand-made drawings
+      return best; };
     const geo = [];
     (D.lines || []).forEach(l => { if (!l.s || !l.pts || l.pts.length < 2) return; const f = near(l.pts[0]), t = near(l.pts[l.pts.length - 1]); if (f && t && f !== t) geo.push({id: l.s, from: f, to: t, ...(l.dashed ? {unc: true} : {})}); });
     if (geo.length > out.length) out = geo;
@@ -1659,6 +1665,9 @@ function packageView(D) {
       members: ms.map(m => ({id: m, title: byId[m].title, tag: byId[m].sub && byId[m].sub !== m && !/패키지/.test(byId[m].sub) ? byId[m].sub : (/^[A-Z]{0,3}-?\d{4}-/.test(m) ? m : '')})), internal: [...(internal[id] || [])]};
     if (p.what) descN[id] = p.what;
   });
+  const seen = new Set((D.nodes || []).map(n => n.id));
+  (D.bars || []).forEach(b => { if (!b.node || seen.has(b.node) || !edges.some(e => e.from === b.node || e.to === b.node)) return; seen.add(b.node);   // headers drawn as bars become boxes
+    nodes.push({id: b.node, title: ((NI0[b.node] || {}).title || String(b.label || b.node).split('·')[0]).trim(), sub: '헤더'}); nodeInfo[b.node] = {title: (NI0[b.node] || {}).title || b.label || b.node, tags: '헤더', info: (NI0[b.node] || {}).info || [], links: touching(b.node)}; });
   (D.nodes || []).forEach(n => {
     if (of[n.id]) return;
     nodes.push({id: n.id, title: n.title, sub: n.sub, src: n.src, area: areaOf(n)});
@@ -1768,8 +1777,11 @@ async function loadProjects() {
 function renderProjects() {
   const q = $('#proj-q').value.trim().toLowerCase(), xs = P.list.filter(p => !q || [p.name, p.product, p.capacity, p.site, p.year].join(' ').toLowerCase().includes(q));
   $('#proj-count').textContent = P.list.length ? `${P.list.length}개` : '';
-  $('#proj-list').innerHTML = xs.length ? xs.map(p => `<button type="button" class="proj" data-p="${esc(p.id)}"><span class="t">${esc(p.name)}</span><span class="m">${esc(projMeta(p) || '제품·능력 미입력')}</span><span class="n"><span>기록 <b>${p.records || 0}</b>건</span><span>설비 <b>${p.equipment || 0}</b></span><span>${new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR')}</span></span></button>`).join('')
-    : `<div class="empty" style="grid-column:1/-1">${P.list.length ? '찾는 프로젝트가 없습니다.' : '아직 프로젝트가 없습니다. "새 프로젝트"로 시작하세요.'}</div>`;
+  const X = exampleProject(), showX = X && (!q || [X.name, X.product, X.capacity, '예시'].join(' ').toLowerCase().includes(q));
+  const exCard = showX ? `<button type="button" class="proj ex" id="proj-ex"><span class="t">${esc(X.name)} <span class="pill">예시</span></span><span class="m">${esc(projMeta(X) || '')}</span><span class="n"><span>${esc(X.memo || '')}</span></span></button>` : '';
+  $('#proj-list').innerHTML = exCard + (xs.length ? xs.map(p => `<button type="button" class="proj" data-p="${esc(p.id)}"><span class="t">${esc(p.name)}</span><span class="m">${esc(projMeta(p) || '제품·능력 미입력')}</span><span class="n"><span>기록 <b>${p.records || 0}</b>건</span><span>설비 <b>${p.equipment || 0}</b></span><span>${new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR')}</span></span></button>`).join('')
+    : `<div class="empty" style="grid-column:1/-1">${P.list.length ? '찾는 프로젝트가 없습니다.' : '아직 프로젝트가 없습니다. "새 프로젝트"로 시작하세요.'}</div>`);
+  if (showX) $('#proj-ex').onclick = openExample;
   $('#proj-list').querySelectorAll('[data-p]').forEach(b => b.onclick = () => openProject(P.list.find(p => p.id === b.dataset.p)));
 }
 function renderHomeStat() {
@@ -1824,21 +1836,23 @@ function resetWork() {
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
 }
 function renderProjectHead() {
-  const p = S.project;
-  $('#p-eyebrow').textContent = p ? '프로젝트' : '둘러보기';
-  $('#p-name').textContent = p ? p.name : (S.viewLabel || '둘러보기');
-  $('#p-meta').innerHTML = p ? [['제품', p.product], ['생산 능력', p.capacity], ['위치', p.site], ['기준 연도', p.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (p.memo ? `<span>${esc(p.memo)}</span>` : '')
+  const p = S.project, X = !p && S.viewProject;
+  $('#p-eyebrow').textContent = p ? '프로젝트' : X ? '예시 프로젝트 · 저장되지 않는 보기' : '둘러보기';
+  $('#p-name').textContent = p ? p.name : X ? X.name : (S.viewLabel || '둘러보기');
+  $('#p-adopt').hidden = !X;
+  if (X) { $('#p-meta').innerHTML = [['제품', X.product], ['생산 능력', X.capacity], ['위치', X.site], ['기준 연도', X.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (X.memo ? `<span>${esc(X.memo)}</span>` : ''); }
+  else $('#p-meta').innerHTML = p ? [['제품', p.product], ['생산 능력', p.capacity], ['위치', p.site], ['기준 연도', p.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (p.memo ? `<span>${esc(p.memo)}</span>` : '')
     : '<span>프로젝트에 저장되지 않는 보기입니다.</span>';
   $('#p-btns').hidden = !p; $('#setup-cols').hidden = !p; $('#r-save').hidden = !p; $('#r-new').textContent = p ? '새 데이터 입력' : '실적 입력으로';
-  $('#nav-cur').textContent = p ? p.name : (S.viewLabel || '둘러보기');
+  $('#nav-cur').textContent = p ? p.name : X ? X.name : (S.viewLabel || '둘러보기');
 }
 async function openProject(p) {
   if (!p || !leaveWork()) return;
   S.project = p; resetWork(); renderProjectHead(); go('project'); await loadRecords();
 }
-async function openView(B, label) {   // demo, real-data sample, a JSON file: shown without a project, never saved
+async function openView(B, label, example) {   // demo, real-data sample, a JSON file: shown without a project, never saved
   if (!leaveWork()) return false;
-  S.project = null; S.viewLabel = label; resetWork(); renderProjectHead(); go('project');
+  S.project = null; S.viewLabel = label; S.viewProject = example || null; resetWork(); renderProjectHead(); go('project');
   await showBundle(B, true); return true;
 }
 /* records of the open project */
@@ -2468,10 +2482,11 @@ if (SAMPLE_DATA && (SAMPLE_DATA.bundle || SAMPLE_DATA.flow)) {
   $('#sample').hidden = false; $('#sample').textContent = (SAMPLE_DATA.label || '실적 샘플') + ' 보기';
   $('#sample-note').hidden = false; $('#sample-note').textContent = SAMPLE_DATA.note || '';
 }
-$('#sample').onclick = async () => {
+const exampleProject = () => SAMPLE_DATA && (SAMPLE_DATA.bundle || SAMPLE_DATA.flow) && SAMPLE_DATA.project ? SAMPLE_DATA.project : null;
+async function openExample() {
   if (!SAMPLE_DATA) return;
   const label = SAMPLE_DATA.label || '실적 샘플';
-  if (!await openView(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), label)) return;
+  if (!await openView(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), label, exampleProject())) return;
   const E = SAMPLE_DATA.equipment;
   if (E && E.rows) {
     Object.assign(EQ, {rows: JSON.parse(JSON.stringify(E.rows)), refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label, file: E.file, sheets: E.sheets}, state: 'done'});
@@ -2479,8 +2494,23 @@ $('#sample').onclick = async () => {
     linkEquipmentToFlow();
   }
   renderEquipment();
-  $('#r-status').textContent = `${label}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다. 프로젝트에 저장되지 않습니다.`;
-};
+  $('#r-status').textContent = `${label}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다. 저장되지 않는 보기입니다${exampleProject() ? ' — "내 실적으로 가져오기"를 누르면 프로젝트로 저장됩니다' : ''}.`;
+}
+$('#sample').onclick = openExample;
+/* The example becomes one of the viewer's own projects (with its record), so it counts as accumulated records. */
+async function adoptExample() {
+  const X = exampleProject(); if (!X || S.project || !S.bundle || busy()) return;
+  try {
+    const have = P.list.find(p => p.example === X.key);
+    if (have) { $('#r-status').textContent = `이미 "${have.name}" 프로젝트로 가져왔습니다. 프로젝트 목록에서 여세요.`; return; }
+    const now = Date.now(), id = 'proj-' + now.toString(36), data = {kind: 'project', createdAt: now, updatedAt: now, records: 0, equipment: 0, example: X.key || 'example'};
+    for (const k in PF) data[k] = X[k] || '';
+    await store.set(id, data);
+    S.project = {...data, id}; S.viewProject = null; S.recordId = null;
+    renderProjectHead(); go('project'); await saveRecord(); await loadRecords();
+    $('#r-status').textContent = `"${data.name}"을 내 실적 프로젝트로 저장했습니다.`;
+  } catch (e) { $('#r-status').textContent = '가져오지 못했습니다' + (e && e.code ? ` (${e.code})` : ''); }
+}
 $('#r-add').onclick = () => generate('add');
 $('#r-sys').addEventListener('input', updateGen);
 $('#r-sys').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#r-add').disabled) generate('add'); });
@@ -2501,6 +2531,7 @@ $('#proj-new').onclick = () => openProjectDialog(null);
 $('#proj-q').addEventListener('input', renderProjects);
 $('#p-edit').onclick = () => openProjectDialog(S.project);
 $('#p-del').onclick = () => armed($('#p-del'), deleteProject);
+$('#p-adopt').onclick = adoptExample;
 $('#pf-cancel').onclick = () => $('#pdlg').close();
 $('#pform').addEventListener('submit', e => { e.preventDefault(); submitProject(); });
 /* detail frame */
