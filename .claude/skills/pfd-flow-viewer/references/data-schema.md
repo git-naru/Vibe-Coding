@@ -135,3 +135,45 @@ A flow may also be given as topology only — `nodes` without coordinates plus
 `"edges": [{"id": "422", "from": "4300-RX-008", "to": "4400-TK-073"}]` and no `lines` — and the app
 lays it out (dagre) the first time it opens. `links` (same shape as `edges`) keeps the equipment tags at
 each stream's ends so the equipment list can pick up stream values.
+
+Optional `desc` on a flow holds the plain-language role of each equipment and line, keyed like `nodeInfo`
+and `streams`. The HTML app writes it with Claude after generation (or from the detail frame's "설명 작성")
+and shows it at the top of each card in the detail frame:
+
+```jsonc
+"desc": {"nodes": {"4300-RX-002": "정제 염수와 Soda Ash 용액을 받아 탄산리튬을 침전시키는 반응조…"},
+         "streams": {"422": "탄산화 반응조에서 시크너로 가는 습윤 Li₂CO₃ 슬러리…"}, "at": 1760000000000}
+```
+
+Optional `packages` on a flow groups equipment boxes (node ids) into purchase / unit-operation packages, the unit
+for investment cost. The HTML app has Claude write it after generation (or from "패키지 묶기") and draws a package
+view from it on the fly: one box per package, only the streams between packages as lines.
+
+```jsonc
+"packages": [{"id": "P1", "name": "Lime 반응 패키지", "what": "염수에 소석회를 넣어 Mg를 침전시킨다",
+              "members": ["3200-RX-005", "3200-TK-001", "3200-TK-093"]}]
+```
+
+## Projects and records (HTML app)
+
+The app keeps its records in the viewer's private store (`data/users/<id>`), one document per item:
+
+| `kind` | id | fields |
+|---|---|---|
+| `project` | `proj-…` | `name`, `product`, `capacity`, `site`, `year`, `memo`, `records`, `equipment`, `createdAt`, `updatedAt` |
+| `record` | `rec-…` | `projectId`, `title`, `tabs` (labels), `streams`, `equipment`, `files`, `parts`, `size`, `createdAt`, `updatedAt` |
+| `part` | `part-<record id>-<n>` | `recordId`, `i`, `data`: a 60,000-character slice of `{"bundle": …, "equipment": {"rows", "refsMissing", "areaNames", "file", "sheets"}}` |
+
+The record's `equipment` may carry `cost`: the matched equipment costs.
+
+```jsonc
+"cost": {"unit": "USD",
+         "list": {"file": "eq-cost.xlsx", "sheet": "EQ COST", "headerRow": 3, "cols": {"tag": "Tag No.", "amount": "Amount (USD)"},
+                  "items": [{"i": 0, "row": 4, "tagRaw": "6300-BO-005/008", "tags": ["6300-BO-005", "6300-BO-008"], "name": "STEAM BOILER", "qty": 2, "cost": 2500000}]},
+         "pick": {"4": "6300-TK-029"},          // list item → PFD equipment chosen by the viewer ("" = not on the PFD)
+         "ai": {"9": ["6300-FA-015"]},          // Claude suggestions for items tags and names did not match
+         "edits": {"6300-PU-024": 7700}}        // costs typed into the table, by normalised tag
+```
+
+A record's JSON is split over part documents so a large main stream stays under the store's 256 KiB per-document limit;
+the record document itself stays small so a project's records list quickly.
