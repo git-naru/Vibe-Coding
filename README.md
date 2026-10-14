@@ -30,8 +30,8 @@ python3 scripts/build_viewer.py examples/demo-steam.json /tmp/demo.html
 
 `apps/pfd-flow-viewer/` — 같은 흐름도를 브라우저에서 만드는 단일 HTML 앱입니다(claude.ai Artifact로 게시).
 
-- 업로드 버튼 → 파일 선택(PDF·XLSX·DOCX, 여러 파일·여러 장) → 그릴 계통 입력 → 생성.
-- 브라우저: 파일 읽기(pdf.js, SheetJS, mammoth), 시트 식별·시트 간 연결, 텍스트·엑셀 표 값 채우기, 물질수지 검증, 자동 배치(dagre).
+- 업로드 버튼 → 파일 선택(PDF·XLSX·DOCX, 여러 파일·여러 장) → 생성. 원료에서 제품까지의 메인 흐름(Main Stream)을 먼저 만들고, 적은 계통(예: 스팀·응축수)은 별도 탭으로 만듭니다. 결과 화면의 "탭 추가"로 계통 탭을 더 만들 수 있습니다.
+- 브라우저: 파일 읽기(pdf.js, SheetJS, mammoth), 시트 식별·시트 간 연결, 텍스트·엑셀 표 값 채우기, 물질수지 검증, 자동 배치(dagre). 메인 흐름(또는 한 줄로 너무 긴 흐름)은 공정 구역(Tag·도면 번호의 4자리 구역)마다 한 줄로 흐름 순서대로 쌓고, 이웃 줄 사이 연결은 줄 사이 간격으로, 재순환·줄 건너뛰기 연결은 왼쪽 여백 통로로 그립니다.
 - Claude(`sample` capability): 계통 범위 판단 1회, 시트별 연결 해석(도면 이미지 + 글자 위치), 표가 이미지인 시트의 표 판독. 판독값은 "이미지 판독값"으로 표시됩니다.
 - 결과는 개인 저장 목록(`db`, 본인만 보임)에 저장하거나 JSON으로 내려받고, 다시 열 때는 Claude를 부르지 않습니다.
 - Equipment List: PDF를 올리면 Claude 없이 자동으로 만듭니다(원형 진행률 0~100%). 설비 이름 아래 단독으로 적힌 Tag를 설비로 보고, 호기 번호 분리·예비/향후 구분·도면 구역(테두리 격자 행-열)을 붙입니다. Tag 없이 이름만 있는 설비는 "미확인" 후보로 넣습니다.
@@ -42,7 +42,10 @@ python3 scripts/build_viewer.py examples/demo-steam.json /tmp/demo.html
 
 ```bash
 python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html   # 예시 데이터를 넣어 단일 파일로 빌드
+python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html --sample /path/sample.json   # 비공개 게시용: "실적 샘플 보기" 버튼에 실데이터 결과 포함
 ```
+
+"실적 샘플"(실제 PFD로 만든 흐름도와 Equipment List)은 실데이터라 저장소에 두지 않고 비공개 게시본에만 넣습니다. 저장소 빌드는 이 버튼이 숨겨지며, CI가 샘플이 비어 있는지 확인합니다.
 
 게시 시 capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}`
 

@@ -21,6 +21,8 @@ def main():
     html = page.read_text(encoding="utf-8")
 
     assert "__DEMO_DATA__" not in html, "demo data placeholder was not replaced"
+    assert "__SAMPLE_DATA__" not in html, "sample data placeholder was not replaced"
+    assert '<script id="sample-data" type="application/json">null</script>' in html, "repository build must not carry a real-data sample"
     demo = re.search(r'<script id="demo-data" type="application/json">(.*?)</script>', html, re.S)
     assert demo, "demo-data script block missing"
     data = json.loads(demo.group(1).replace("<\\/", "</"))

@@ -154,6 +154,13 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .chipgroup .lab{font-size:11.5px;color:var(--muted)}
 .crop{max-width:100%;border:1px solid var(--rule);border-radius:4px;background:#fff}
 @media (prefers-reduced-motion:reduce){.ln{transition:none}}
+/* ---- system tabs ---- */
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--rule)}
+.tabs button[role=tab]{border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;background:none;padding:8px 14px;color:var(--muted);font-weight:500;margin-bottom:-1px}
+.tabs button[role=tab][aria-selected=true]{background:var(--panel);border-color:var(--rule);color:var(--ink);font-weight:600}
+.tabs button[role=tab] .k{font:600 10.5px var(--f-mono);letter-spacing:.06em;color:var(--accent);margin-right:6px}
+.addsys{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.addsys input{flex:0 1 220px}
 /* ---- equipment list ---- */
 .eqhead{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
 .eqhead .t{display:flex;align-items:center;gap:14px;min-width:0}
@@ -201,7 +208,7 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
   <header>
     <div class="eyebrow">PFD Flow Viewer</div>
     <h1>PFD 흐름도 만들기</h1>
-    <p class="lede">PFD와 Mass Balance 파일을 올리고 그릴 계통을 적으면, 시트를 넘나드는 흐름까지 이어서 클릭할 수 있는 흐름도로 보여줍니다. PDF를 올리면 Equipment List도 바로 만들어 Excel로 내려받을 수 있습니다. 파일 읽기·설비 목록·수지 검증·그리기는 브라우저가 하고, Claude는 계통 범위와 연결 해석, 이미지로 된 표 판독에만 씁니다.</p>
+    <p class="lede">PFD와 Mass Balance 파일을 올리면 원료에서 제품까지의 메인 흐름을 시트를 넘나들며 이어 그리고, 스팀·용수 같은 다른 계통은 별도 탭으로 보여줍니다. PDF를 올리면 Equipment List도 바로 만들어 Excel로 내려받을 수 있습니다. 파일 읽기·설비 목록·수지 검증·그리기는 브라우저가 하고, Claude는 계통 범위와 연결 해석, 이미지로 된 표 판독에만 씁니다.</p>
   </header>
 
   <div class="cols" id="setup-cols">
@@ -215,14 +222,14 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
       <div class="tblwrap"><table class="tbl files" id="files"></table></div>
       <div class="summary" id="local"></div>
       <div class="row">
-        <label class="lab" for="system">그릴 계통</label>
-        <input type="text" id="system" placeholder="예: 스팀 생산·분배 계통" autocomplete="off">
+        <label class="lab" for="system">함께 만들 계통 탭 (선택)</label>
+        <input type="text" id="system" placeholder="예: 스팀·응축수 (비우면 메인 흐름만)" autocomplete="off">
       </div>
       <div class="row" id="suggest"></div>
       <div class="row">
         <button type="button" class="primary" id="gen" disabled>흐름도 생성</button>
         <button type="button" id="stop" hidden>중지</button>
-        <span class="muted" id="gen-note">파일을 올리면 시트 확인까지는 바로 됩니다. 생성 단계에서 Claude를 부르며, 처음 한 번 사용 동의를 묻습니다.</span>
+        <span class="muted" id="gen-note">원료에서 제품까지의 메인 흐름(Main Stream)을 먼저 만들고, 적은 계통은 별도 탭으로 만듭니다. 생성 단계에서 Claude를 부르며, 처음 한 번 사용 동의를 묻습니다.</span>
       </div>
       <ol class="steps" id="steps"></ol>
       <div class="msg" id="msg"></div>
@@ -234,9 +241,11 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
       <div class="row">
         <button type="button" id="open-json">JSON 파일 열기</button>
         <input type="file" id="json-file" accept=".json,application/json" hidden>
-        <button type="button" id="demo">예시 보기</button>
+        <button type="button" id="demo">예시 보기 (가상)</button>
+        <button type="button" class="primary" id="sample" hidden>실적 샘플 보기</button>
       </div>
-      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다.</p>
+      <p class="muted" style="margin:0">저장한 흐름도는 다시 열어도 Claude를 부르지 않습니다. 스킬로 만든 데이터 JSON도 열 수 있습니다. "예시 보기"는 기능 확인용 가상 데이터입니다.</p>
+      <p class="muted" id="sample-note" hidden style="margin:0"></p>
     </section>
   </div>
 
@@ -265,11 +274,13 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
     <div class="toolbar">
       <div class="muted" id="r-status"></div>
       <div class="btns">
+        <span class="addsys"><input type="text" id="r-sys" placeholder="계통 탭 추가 (예: 스팀·응축수)" aria-label="추가할 계통"><button type="button" id="r-add" disabled>탭 추가</button></span>
         <button type="button" id="r-new">새로 만들기</button>
         <button type="button" id="r-save">저장</button>
         <button type="button" id="r-dl">JSON 내려받기</button>
       </div>
     </div>
+    <div class="tabs" role="tablist" id="r-tabs" aria-label="계통"></div>
     <div class="vhead">
       <div>
         <div class="eyebrow" id="v-eyebrow"></div>
@@ -291,6 +302,7 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 </div>
 
 <script id="demo-data" type="application/json">__DEMO_DATA__</script>
+<script id="sample-data" type="application/json">__SAMPLE_DATA__</script>
 <script>
 "use strict";
 /* =====================================================================
@@ -511,7 +523,7 @@ function parseXlsxTables(wb) {
 /* =====================================================================
    3. Reading files (browser only)
    ===================================================================== */
-const S = {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, ctl: null, running: false};
+const S = {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, ctl: null, running: false};
 let fileSeq = 0;
 
 async function readPdf(entry) {
@@ -651,9 +663,13 @@ function renderLocal() {
   sh.forEach(s => { const t = s.title.toUpperCase(); if (/STEAM/.test(t)) words.add('스팀 계통'); if (/WATER/.test(t)) words.add('용수 계통'); if (/AIR/.test(t)) words.add('압축공기 계통'); if (/LIM/.test(t)) words.add('Liming 공정'); if (/CARBONAT/.test(t)) words.add('탄산화 공정'); });
   $('#suggest').innerHTML = [...words].slice(0, 6).map(w => `<button type="button" class="chip" data-w="${esc(w)}">${esc(w)}</button>`).join('');
   $('#suggest').querySelectorAll('[data-w]').forEach(b => b.onclick = () => { $('#system').value = b.dataset.w; updateGen(); });
+  if (words.size) $('#suggest').insertAdjacentHTML('afterbegin', '<span class="muted">탭으로 추가할 계통:</span>');
   updateGen();
 }
-function updateGen() { $('#gen').disabled = S.running || !S.sheets.length || !$('#system').value.trim(); }
+function updateGen() {
+  $('#gen').disabled = S.running || !S.sheets.length;
+  $('#r-add').disabled = S.running || !S.sheets.length || !S.bundle || !$('#r-sys').value.trim();
+}
 
 /* =====================================================================
    4. Rendering pieces of a page for Claude
@@ -719,14 +735,19 @@ async function ask(prompt, images, tier) {
 }
 const short = d => (d || '').replace(/^.*?-(\d{4}-[A-Z]{2}-[A-Z]{3}-\d+)$/, '$1');
 
-function scopePrompt(system) {
+const MAIN_SYS = '메인 흐름 (원료 → 제품)';
+function scopePrompt(system, isMain) {
   const lines = S.sheets.map(s => `${s.dwg || '(번호 없음)'} | ${s.title || '-'} | ${s.key} | 도면 위 Stream 번호: ${s.badges.slice(0, 80).join(', ')}`);
   const conns = S.links.flows.map(f => `${f.sheet}: ${f.dir} ${f.stream || '-'} ${f.dir === 'TO' ? '→' : '←'} ${f.dwg}${f.target ? '' : ' (입력에 없음)'} | ${f.label} ${f.detail}`);
   return `[[SCOPE]]
 너는 공정 설계 엔지니어다. 아래는 사용자가 올린 PFD 시트 목록, 시트 사이 연결 표시(off-page connector), 시트마다 도면에 적힌 Stream 번호다.
-사용자가 그리려는 계통: "${system}"
+${isMain ? `사용자가 그리려는 것: 메인 흐름(Main Stream). 원료가 들어와 최종 제품이 나가기까지의 공정 흐름이다.
+먼저 시트 제목, 연결 표시, 참고 문서에서 원료(예: 염수)와 최종 제품(예: 탄산리튬, 수산화리튬)을 찾아 feed와 product에 적는다.
+mainSheets는 원료 투입부터 제품 포장까지 거치는 공정 시트 전부다(유틸리티·시약 조제·서비스 시트는 제외).
+streams에는 원료→제품 경로, 재순환(모액·여액 등), 주 반응조에 들어가는 주요 시약, 고형 폐기물 Stream을 넣는다. 스팀·응축수·냉각수·용수·공기 같은 유틸리티 Stream은 넣지 않는다(다른 탭에서 다룬다).
+categories는 main(원료·공정 흐름), product(제품), recycle(재순환), reagent(시약), discard(폐기)를 기본으로 쓴다.` : `사용자가 그리려는 계통: "${system}"`}
 
-할 일: 이 계통을 그리는 데 필요한 시트와 Stream을 고른다.
+할 일: 이 ${isMain ? '흐름' : '계통'}을 그리는 데 필요한 시트와 Stream을 고른다.
 - mainSheets: 이 계통 자체를 그린 시트(그 시트의 Stream은 전부 계통에 포함).
 - sideSheets: 다른 공정 시트 중 이 계통의 Stream이 이어지는 시트와, 그 시트에서 따라갈 Stream 번호.
 - streams: 포함할 Stream 전부. 연결 표시 설명으로 성격을 알 수 있으면 cat과 ko를 채우고, 모르면 cat은 비워 둔다.
@@ -734,7 +755,7 @@ function scopePrompt(system) {
 - 목록에 있는 도면 번호와 Stream 번호만 쓴다. 지어내지 않는다.
 
 출력은 JSON 하나만:
-{"title":"짧은 한국어 계통 이름","summary":"이 계통을 2~3문장으로","mainSheets":["도면번호"],"sideSheets":[{"dwg":"도면번호","streams":["980"]}],"categories":[{"key":"steam","label":"고압증기"}],"streams":[{"id":"980","cat":"steam","ko":"짧은 한국어 이름"}]}
+{"title":"짧은 한국어 계통 이름","summary":"이 계통을 2~3문장으로",${isMain ? '"feed":"원료","product":"최종 제품",' : ''}"mainSheets":["도면번호"],"sideSheets":[{"dwg":"도면번호","streams":["980"]}],"categories":[{"key":"steam","label":"고압증기"}],"streams":[{"id":"980","cat":"steam","ko":"짧은 한국어 이름"}]}
 
 ## 시트 (도면 번호 | 제목 | 파일·페이지 | 도면 위 Stream 번호)
 ${lines.join('\n')}
@@ -797,7 +818,10 @@ const STEP_DEFS = [
   ['topo', '시트 안 연결 해석', 'Claude'], ['values', 'Stream 값 채우기', '브라우저·Claude'], ['check', '물질수지·시트 간 비교', '브라우저'],
   ['draw', '자동 배치·그리기', '브라우저']];
 const stepState = {};
-function setStep(k, st, det) { stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps(); }
+function setStep(k, st, det) {
+  stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps();
+  if (S.addMode && st === 'run') $('#r-status').textContent = `${S.jobLabel} 탭 만드는 중 · ${(STEP_DEFS.find(d => d[0] === k) || [])[1] || k}${det ? ' · ' + det : ''}`;
+}
 function renderSteps() {
   const ic = {wait: '·', run: '…', done: '✓', fail: '!', skip: '–'};
   $('#steps').innerHTML = STEP_DEFS.map(([k, n, who]) => { const s = stepState[k] || {st: 'wait'};
@@ -805,85 +829,105 @@ function renderSteps() {
 }
 function say(text, cls) { const m = $('#msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || ''; }
 
-async function generate() {
-  const system = $('#system').value.trim(); if (!system || S.running) return;
-  S.running = true; updateGen(); $('#stop').hidden = false; say('');
-  S.ctl = new AbortController(); calls = 0; Object.keys(stepState).forEach(k => delete stepState[k]);
-  setStep('read', 'done', `${S.files.filter(f => f.ok).length}개 파일`);
-  setStep('sheets', 'done', `${S.sheets.length}장 · 연결 ${S.links.flows.length}건 중 ${S.links.matched}건 양쪽 일치`);
+/* One flow (one tab): scope → per-sheet connections → values → checks → layout. */
+async function buildFlow(system, isMain, maxImg) {
+  // ---- scope
+  setStep('scope', 'run', 'Claude 1회');
+  const sc = await ask(scopePrompt(system, isMain), null, 'default');
+  const findSheet = d => S.links.sheetOf(String(d || '')) ;
+  const main = [...new Set((sc.mainSheets || []).map(findSheet).filter(Boolean))];
+  const side = (sc.sideSheets || []).map(x => ({sh: findSheet(x.dwg), streams: (x.streams || []).map(String)})).filter(x => x.sh && !main.includes(x.sh));
+  if (!main.length) throw {code: 'no_scope', message: '계통에 해당하는 시트를 찾지 못했습니다. 계통 이름을 바꿔 보세요.'};
+  const cats = (sc.categories || []).filter(c => c && c.key).slice(0, 7);
+  if (!cats.length) cats.push({key: 'flow', label: '공정 흐름'});
+  const scopeStreams = {}; (sc.streams || []).forEach(s => scopeStreams[String(s.id)] = s);
+  setStep('scope', 'done', `${sc.title || system} · 주 시트 ${main.length}장, 연결 시트 ${side.length}장`);
+
+  // ---- topology per sheet
+  const work = [...main.map(sh => ({sh, streams: [...new Set([...sh.badges, ...sh.connectors.filter(c => c.kind === 'flow' && c.stream).map(c => c.stream)])], main: true})),
+                ...side.map(x => ({sh: x.sh, streams: x.streams, main: false}))];
+  const nTiles = Math.min(4, maxImg);
+  const topo = [];
+  for (let i = 0; i < work.length; i++) {
+    const w = work[i]; setStep('topo', 'run', `${i + 1}/${work.length}장 · ${short(w.sh.dwg)} · Claude`);
+    const imgs = nTiles ? await diagramTiles(w.sh, nTiles) : null;
+    const r = await ask(topoPrompt(w.sh, w.streams, cats, nTiles), imgs, 'default');
+    topo.push({...w, r});
+  }
+  setStep('topo', 'done', `${work.length}장 · Claude ${work.length}회${nTiles ? '' : ' (이미지 없이 글자만)'}`);
+
+  // ---- values
+  setStep('values', 'run');
+  const inScope = new Set([...Object.keys(scopeStreams), ...topo.flatMap(t => (t.r.streams || []).map(s => String(s.id)))]);
+  const vals = {}; // id -> [{sheet, src, v, comp, compSolids, extraProps, desc, decimalComma}]
+  const addVals = (sheetDwg, src, tbl, mapped, dc) => { for (const id of Object.keys(mapped)) { if (!inScope.has(id)) continue; (vals[id] = vals[id] || []).push({sheet: sheetDwg, src, ...mapped[id], desc: (tbl.desc || {})[id] || '', decimalComma: dc}); } };
+  let imgCalls = 0;
+  for (const w of work) {
+    const sh = w.sh, ids = [...new Set((w.r = topo.find(t => t.sh === sh).r, (w.r.streams || []).map(s => String(s.id))))];
+    if (!ids.length) continue;
+    if (sh.textTable) { const t = sh.textTable; const dc = looksDecimalComma(Object.values(t.colValues).flat()); addVals(sh.dwg, 'text', t, mapRows(t.rows, t.ids, t.colValues), dc); continue; }
+    if (!sh.imgs.length || !maxImg) continue;
+    setStep('values', 'run', `${short(sh.dwg)} 표 이미지 판독 · Claude`);
+    const {strips} = await tableStrips(sh, sh.imgs[0]);
+    for (let k = 0; k < strips.length; k += maxImg) {
+      const part = strips.slice(k, k + maxImg), blobs = []; for (const c of part) blobs.push(await toBlob(c));
+      const r = await ask(tablePrompt(sh, ids, blobs.length), blobs, 'default'); imgCalls++;
+      const rows = (r.rows || []).map(x => ({label: String(x.label || ''), unit: String(x.unit || '')}));
+      const colValues = {}, desc = {};
+      (r.columns || []).forEach(c => { const id = String(c.stream); if (!ids.includes(id)) return; colValues[id] = (c.values || []).map(v => String(v)); desc[id] = c.description || ''; });
+      const got = Object.keys(colValues); if (!got.length) continue;
+      const dc = looksDecimalComma(Object.values(colValues).flat());
+      addVals(sh.dwg, 'image', {desc}, mapRows(rows, got, colValues), dc);
+    }
+  }
+  for (const t of S.xlsxTables) addVals(`${t.file} · ${t.sheet}`, 'xlsx', t, mapRows(t.rows, t.ids, t.colValues), looksDecimalComma(Object.values(t.colValues).flat()));
+  setStep('values', 'done', `${Object.keys(vals).length}개 Stream · 표 이미지 판독 Claude ${imgCalls}회`);
+
+  // ---- assemble + checks + layout
+  setStep('check', 'run');
+  const D = assemble({system, sc, cats, topo, vals, main, side});
+  if (isMain) D.meta.main = true;   // the row-per-area layout keys on this
+  setStep('check', 'done', `${D.checks.length}개 검사 · 시트 간 차이 ${D._diffs}건`);
+  setStep('draw', 'run'); await loadScript(CDN.dagre); layout(D); setStep('draw', 'done', `설비 ${D.nodes.length}개 · 라인 ${D.lines.length}개`);
+  delete D._diffs; D.meta.generated = {at: new Date().toISOString(), calls};
+  if (isMain) { D.meta.eyebrow = [sc.feed && '원료 ' + sc.feed, sc.product && '제품 ' + sc.product].filter(Boolean).join(' → ') || D.meta.eyebrow; D.meta.main = true; }
+  return D;
+}
+
+/* "흐름도 생성": the main stream first, then the optional extra system as its own tab.
+   "탭 추가" (mode 'add'): one more system tab on the current result. */
+async function generate(mode) {
+  if (S.running) return;
+  const add = mode === 'add', extra = (add ? $('#r-sys') : $('#system')).value.trim();
+  if (add && (!extra || !S.bundle)) return;
+  const jobs = add ? [{system: extra, main: false}] : [{system: MAIN_SYS, main: true}, ...(extra ? [{system: extra, main: false}] : [])];
+  S.running = true; S.addMode = add; updateGen(); $('#stop').hidden = false; say('');
+  S.ctl = new AbortController(); calls = 0;
+  const tabs = [];
   try {
     SAMPLE = window.claude ? await window.claude.use('sample') : null;
     if (!SAMPLE) throw {code: 'unavailable_here'};
     LIM = await SAMPLE.limits().catch(() => null);
     const maxImg = (LIM && LIM.images && LIM.images.maxCount) || 0;
-
-    // ---- scope
-    setStep('scope', 'run', 'Claude 1회');
-    const sc = await ask(scopePrompt(system), null, 'default');
-    const findSheet = d => S.links.sheetOf(String(d || '')) ;
-    const main = [...new Set((sc.mainSheets || []).map(findSheet).filter(Boolean))];
-    const side = (sc.sideSheets || []).map(x => ({sh: findSheet(x.dwg), streams: (x.streams || []).map(String)})).filter(x => x.sh && !main.includes(x.sh));
-    if (!main.length) throw {code: 'no_scope', message: '계통에 해당하는 시트를 찾지 못했습니다. 계통 이름을 바꿔 보세요.'};
-    const cats = (sc.categories || []).filter(c => c && c.key).slice(0, 7);
-    if (!cats.length) cats.push({key: 'flow', label: '공정 흐름'});
-    const scopeStreams = {}; (sc.streams || []).forEach(s => scopeStreams[String(s.id)] = s);
-    setStep('scope', 'done', `${sc.title || system} · 주 시트 ${main.length}장, 연결 시트 ${side.length}장`);
-
-    // ---- topology per sheet
-    const work = [...main.map(sh => ({sh, streams: [...new Set([...sh.badges, ...sh.connectors.filter(c => c.kind === 'flow' && c.stream).map(c => c.stream)])], main: true})),
-                  ...side.map(x => ({sh: x.sh, streams: x.streams, main: false}))];
-    const nTiles = Math.min(4, maxImg);
-    const topo = [];
-    for (let i = 0; i < work.length; i++) {
-      const w = work[i]; setStep('topo', 'run', `${i + 1}/${work.length}장 · ${short(w.sh.dwg)} · Claude`);
-      const imgs = nTiles ? await diagramTiles(w.sh, nTiles) : null;
-      const r = await ask(topoPrompt(w.sh, w.streams, cats, nTiles), imgs, 'default');
-      topo.push({...w, r});
+    for (const job of jobs) {
+      Object.keys(stepState).forEach(k => delete stepState[k]); S.jobLabel = job.main ? 'Main Stream' : job.system;
+      setStep('read', 'done', `${S.files.filter(f => f.ok).length}개 파일 · ${S.jobLabel} 만드는 중`);
+      setStep('sheets', 'done', `${S.sheets.length}장 · 연결 ${S.links.flows.length}건 중 ${S.links.matched}건 양쪽 일치`);
+      const D = await buildFlow(job.system, job.main, maxImg);
+      tabs.push({key: job.main ? 'main' : 'sys-' + Date.now() + '-' + tabs.length, label: job.main ? 'Main Stream' : (D.meta.title || job.system), main: job.main, flow: D});
     }
-    setStep('topo', 'done', `${work.length}장 · Claude ${work.length}회${nTiles ? '' : ' (이미지 없이 글자만)'}`);
-
-    // ---- values
-    setStep('values', 'run');
-    const inScope = new Set([...Object.keys(scopeStreams), ...topo.flatMap(t => (t.r.streams || []).map(s => String(s.id)))]);
-    const vals = {}; // id -> [{sheet, src, v, comp, compSolids, extraProps, desc, decimalComma}]
-    const addVals = (sheetDwg, src, tbl, mapped, dc) => { for (const id of Object.keys(mapped)) { if (!inScope.has(id)) continue; (vals[id] = vals[id] || []).push({sheet: sheetDwg, src, ...mapped[id], desc: (tbl.desc || {})[id] || '', decimalComma: dc}); } };
-    let imgCalls = 0;
-    for (const w of work) {
-      const sh = w.sh, ids = [...new Set((w.r = topo.find(t => t.sh === sh).r, (w.r.streams || []).map(s => String(s.id))))];
-      if (!ids.length) continue;
-      if (sh.textTable) { const t = sh.textTable; const dc = looksDecimalComma(Object.values(t.colValues).flat()); addVals(sh.dwg, 'text', t, mapRows(t.rows, t.ids, t.colValues), dc); continue; }
-      if (!sh.imgs.length || !maxImg) continue;
-      setStep('values', 'run', `${short(sh.dwg)} 표 이미지 판독 · Claude`);
-      const {strips} = await tableStrips(sh, sh.imgs[0]);
-      for (let k = 0; k < strips.length; k += maxImg) {
-        const part = strips.slice(k, k + maxImg), blobs = []; for (const c of part) blobs.push(await toBlob(c));
-        const r = await ask(tablePrompt(sh, ids, blobs.length), blobs, 'default'); imgCalls++;
-        const rows = (r.rows || []).map(x => ({label: String(x.label || ''), unit: String(x.unit || '')}));
-        const colValues = {}, desc = {};
-        (r.columns || []).forEach(c => { const id = String(c.stream); if (!ids.includes(id)) return; colValues[id] = (c.values || []).map(v => String(v)); desc[id] = c.description || ''; });
-        const got = Object.keys(colValues); if (!got.length) continue;
-        const dc = looksDecimalComma(Object.values(colValues).flat());
-        addVals(sh.dwg, 'image', {desc}, mapRows(rows, got, colValues), dc);
-      }
-    }
-    for (const t of S.xlsxTables) addVals(`${t.file} · ${t.sheet}`, 'xlsx', t, mapRows(t.rows, t.ids, t.colValues), looksDecimalComma(Object.values(t.colValues).flat()));
-    setStep('values', 'done', `${Object.keys(vals).length}개 Stream · 표 이미지 판독 Claude ${imgCalls}회`);
-
-    // ---- assemble + checks + layout
-    setStep('check', 'run');
-    const D = assemble({system, sc, cats, topo, vals, main, side});
-    setStep('check', 'done', `${D.checks.length}개 검사 · 시트 간 차이 ${D._diffs}건`);
-    setStep('draw', 'run'); await loadScript(CDN.dagre); layout(D); setStep('draw', 'done', `설비 ${D.nodes.length}개 · 라인 ${D.lines.length}개`);
-    delete D._diffs; D.meta.generated = {at: new Date().toISOString(), calls};
-    S.result = D; showResult(D, false);
-    say(`완료: Claude ${calls}회 호출. 자동 해석 결과이므로 '확인 필요' 표시와 물질수지 경고를 먼저 확인하세요.`);
+    if (add) { S.bundle.tabs.push(...tabs); S.bundle.active = S.bundle.tabs.length - 1; $('#r-sys').value = ''; }
+    else S.bundle = {kind: 'bundle', title: tabs[0].flow.meta.title, tabs, active: 0};
+    showBundle(S.bundle, false);
+    say(`완료: 탭 ${tabs.length}개 · Claude ${calls}회 호출. 자동 해석 결과이므로 '확인 필요' 표시와 물질수지 경고를 먼저 확인하세요.`);
   } catch (e) {
     const k = Object.keys(stepState).find(x => stepState[x].st === 'run'); if (k) setStep(k, 'fail');
     if (e && e.code === 'unavailable_here') say('Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다. 시트 확인 결과와 저장된 흐름도 열기는 여기서도 됩니다.', 'warn');
     else if (e && e.code === 'no_scope') say(e.message, 'warn');
     else if (e && e.code) say(errText(e), e.code === 'cancelled' ? '' : 'bad');
     else { console.error(e); say('생성 중 오류: ' + (e && e.message || e), 'bad'); }
-  } finally { S.running = false; $('#stop').hidden = true; updateGen(); }
+    if (add) $('#r-status').textContent = '탭을 추가하지 못했습니다. 위쪽 진행 상태의 메시지를 확인하세요.';
+  } finally { S.running = false; S.addMode = false; $('#stop').hidden = true; updateGen(); }
 }
 
 /* Merge per-sheet answers into one graph + the viewer data. */
@@ -989,19 +1033,109 @@ function assemble({system, sc, cats, topo, vals, main, side}) {
 }
 
 /* Layered layout (dagre) → node boxes, polylines and badge positions in the viewer format. */
-function layout(D) {
+/* Layout. Small systems: one left-to-right dagre graph. A main stream (or any flow that would run
+   very wide) is laid out one process area per row, rows stacked top to bottom in flow order; links
+   between neighbouring rows run in the gap between them, recycles and row-skipping links run in lanes
+   down the left margin. */
+const NODE_SIZE = n => n.src ? [170, 46] : [190, 64];
+function areaOf(n) {
+  const t = String(n.id || '').match(/^(?:[A-Z]{1,3}-)?(\d{4})-[A-Z]{2,4}-\d/);
+  if (t) return t[1];
+  const d = String(n.sheet || n.id || '').match(/(?:^|[-:])(\d{4})-[A-Z]{2}-(?:PFD|PID|P&ID)/);
+  return d ? d[1] : null;
+}
+function dagreLayout(nodes, edges, opts) {
   const g = new dagre.graphlib.Graph({multigraph: true});
-  g.setGraph({rankdir: 'LR', nodesep: 26, ranksep: 90, edgesep: 14, marginx: 24, marginy: 24});
+  g.setGraph({rankdir: 'LR', nodesep: 26, ranksep: 90, edgesep: 14, marginx: 0, marginy: 0, ...(opts || {})});
   g.setDefaultEdgeLabel(() => ({}));
-  const size = n => n.src ? [170, 46] : [190, 64];
-  D.nodes.forEach(n => { const [w, h] = size(n); g.setNode(n.id, {width: w, height: h}); });
-  D.edges.forEach((e, i) => g.setEdge(e.from, e.to, {width: 20 + (D.streams[e.id].label || e.id).length * 8, height: 22, labelpos: 'c'}, 'e' + i));
+  nodes.forEach(n => { const [w, h] = NODE_SIZE(n); g.setNode(n.id, {width: w, height: h}); });
+  edges.forEach(e => g.setEdge(e.from, e.to, {width: e.lw, height: 22, labelpos: 'c'}, e.key));
   dagre.layout(g);
+  return g;
+}
+const midOf = pts => { let best = 0, bi = 0; for (let i = 0; i < pts.length - 1; i++) { const l = Math.abs(pts[i + 1][0] - pts[i][0]) + Math.abs(pts[i + 1][1] - pts[i][1]); if (l > best) { best = l; bi = i; } } const [a, b] = [pts[bi], pts[bi + 1]]; return [Math.round((a[0] + b[0]) / 2), Math.round((a[1] + b[1]) / 2)]; };
+function layout(D) {
+  const edges = D.edges.map((e, i) => ({...e, key: 'e' + i, lw: 20 + (D.streams[e.id].label || e.id).length * 8}));
+  const g = dagreLayout(D.nodes, edges, {marginx: 24, marginy: 24});
   const gr = g.graph();
-  D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = size(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src}; });
-  D.lines = D.edges.map((e, i) => { const ed = g.edge({v: e.from, w: e.to, name: 'e' + i}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
-  D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
+  // area per node: tag or sheet; boxes without one (off-page, battery limit) join their neighbour's area
+  const area = {}; D.nodes.forEach(n => area[n.id] = areaOf(n));
+  for (let pass = 0; pass < 3; pass++) edges.forEach(e => { if (!area[e.from] && area[e.to]) area[e.from] = area[e.to]; if (!area[e.to] && area[e.from]) area[e.to] = area[e.from]; });
+  D.nodes.forEach(n => { if (!area[n.id]) area[n.id] = '?'; });
+  const areas = [...new Set(Object.values(area))];
+  const rows = areas.length >= 2 && (D.meta.main || gr.width > 1800);
   D.links = D.edges.map(e => ({id: e.id, from: e.from, to: e.to}));   // equipment ends of each stream (the equipment list reads them)
+  if (!rows) {
+    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src}; });
+    D.lines = edges.map(e => { const ed = g.edge({v: e.from, w: e.to, name: e.key}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
+    D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
+    delete D.edges; return;
+  }
+  // rows in flow order (mean x in the one-line layout); '?' last
+  const meanX = a => { const xs = D.nodes.filter(n => area[n.id] === a).map(n => g.node(n.id).x); return xs.reduce((p, q) => p + q, 0) / xs.length; };
+  areas.sort((p, q) => (p === '?') - (q === '?') || meanX(p) - meanX(q));
+  const rowOf = {}; D.nodes.forEach(n => rowOf[n.id] = areas.indexOf(area[n.id]));
+  const sub = areas.map(a => {
+    const ns = D.nodes.filter(n => area[n.id] === a), es = edges.filter(e => area[e.from] === a && area[e.to] === a);
+    return {a, ns, es, g: dagreLayout(ns, es, {ranksep: 70})};
+  });
+  // lanes: below each row (links leaving it downward or to the margin), above each row (margin links arriving), left margin
+  const cross = edges.filter(e => rowOf[e.from] !== rowOf[e.to]);
+  const below = areas.map(() => []), above = areas.map(() => []), left = [];
+  cross.forEach(e => { const r = rowOf[e.from], t = rowOf[e.to]; below[r].push(e); if (t !== r + 1) { above[t].push(e); left.push(e); } });
+  const LANE = 12, PAD = 34, marginL = 30 + left.length * LANE, TOP = 36;
+  let y = TOP; const rowBox = [];
+  sub.forEach((r, i) => {
+    const gg = r.g.graph(), h = Math.max(gg.height, 50);
+    if (i) y += PAD + below[i - 1].length * LANE + above[i].length * LANE + 22;
+    rowBox.push({x: marginL, y, w: gg.width, h}); y += h;
+  });
+  const pos = {};
+  sub.forEach((r, i) => r.ns.forEach(n => { const p = r.g.node(n.id), [w, h] = NODE_SIZE(n); pos[n.id] = {x: Math.round(rowBox[i].x + p.x - w / 2), y: Math.round(rowBox[i].y + p.y - h / 2), w, h}; }));
+  const lines = [];
+  sub.forEach((r, i) => r.es.forEach(e => {
+    const ed = r.g.edge({v: e.from, w: e.to, name: e.key}), bx = rowBox[i], A = pos[e.from], B = pos[e.to];
+    const pts = ed.points.map(p => [Math.round(bx.x + p.x), Math.round(bx.y + p.y)]), k = pts.length - 1;
+    // dagre clips a steep edge at the box top/bottom, and the slanted run can cut the corner of a box
+    // stacked next to it; forward edges leave from the right side and enter on the left instead
+    if (k > 1 && pts[1][0] > A.x + A.w) pts[0] = [A.x + A.w, Math.round(A.y + A.h / 2)];
+    if (k > 1 && pts[k - 1][0] < B.x) pts[k] = [B.x, Math.round(B.y + B.h / 2)];
+    lines.push({s: e.id, pts, lab: [Math.round(bx.x + ed.x), Math.round(bx.y + ed.y)], dashed: e.unc});
+  }));
+  // spread several links leaving / entering the same box side
+  const outs = {}, ins = {}; cross.forEach(e => { (outs[e.from] = outs[e.from] || []).push(e); (ins[e.to] = ins[e.to] || []).push(e); });
+  const spread = (list, e, w) => { const k = list.indexOf(e), n = list.length; return n < 2 ? 0 : Math.round((k - (n - 1) / 2) * Math.min(28, (w - 30) / (n - 1))); };
+  // a vertical drop from a box can hit another box of the same row (dagre stacks a row's nodes);
+  // then the link leaves the box side and drops in the nearest free column gap instead
+  const rowNodes = rowBox.map((_, i) => D.nodes.filter(n => rowOf[n.id] === i).map(n => pos[n.id]));
+  const hits = (i, x0, y0, x1, y1, skip) => rowNodes[i].some(b => b !== skip[0] && b !== skip[1] && Math.max(x0, x1) > b.x - 4 && Math.min(x0, x1) < b.x + b.w + 4 && Math.max(y0, y1) > b.y - 4 && Math.min(y0, y1) < b.y + b.h + 4);
+  const sideX = (i, box, my, yEdge, dir) => {   // first x beside the box whose vertical run to the row edge is clear
+    for (let k = 0; k < 60; k++) { const x = dir > 0 ? box.x + box.w + 14 + k * 8 : box.x - 14 - k * 8;
+      if (!hits(i, x, my, x, yEdge, [box]) && !hits(i, dir > 0 ? box.x + box.w : x, my, dir > 0 ? x : box.x, my, [box])) return x; }
+    return dir > 0 ? box.x + box.w + 14 : box.x - 14;
+  };
+  cross.forEach(e => {
+    const A = pos[e.from], B = pos[e.to], r = rowOf[e.from], t = rowOf[e.to];
+    const sx = A.x + A.w / 2 + spread(outs[e.from], e, A.w), tx = B.x + B.w / 2 + spread(ins[e.to], e, B.w);
+    const rb = rowBox[r].y + rowBox[r].h, laneBelow = rb + 14 + below[r].indexOf(e) * LANE;
+    const laneIn = t === r + 1 ? laneBelow : rowBox[t].y - 14 - above[t].indexOf(e) * LANE;
+    let out, inn;
+    if (!hits(r, sx, A.y + A.h, sx, rb + 2, [A])) out = [[sx, A.y + A.h], [sx, laneBelow]];
+    else { const my = A.y + A.h / 2, x = sideX(r, A, my, rb + 2, 1); out = [[A.x + A.w, my], [x, my], [x, laneBelow]]; }
+    if (!hits(t, tx, rowBox[t].y - 2, tx, B.y, [B])) inn = [[tx, laneIn], [tx, B.y]];
+    else { const my = B.y + B.h / 2, x = sideX(t, B, my, rowBox[t].y - 2, -1); inn = [[x, laneIn], [x, my], [B.x, my]]; }
+    let pts;
+    if (t === r + 1) pts = [...out, ...inn];
+    else { const xl = 18 + left.indexOf(e) * LANE; pts = [...out, [xl, laneBelow], [xl, laneIn], ...inn]; }
+    pts = pts.map(p => [Math.round(p[0]), Math.round(p[1])]);
+    lines.push({s: e.id, pts, lab: midOf(pts), dashed: e.unc});
+  });
+  const names = {}; (S.sheets || []).forEach(sh => { if (sh.area && sh.area.code && sh.area.name) names[sh.area.code] = sh.area.name; });
+  D.frames = rowBox.map((b, i) => ({x: b.x - 12, y: b.y - 26, w: b.w + 24, h: b.h + 36, title: areas[i] === '?' ? '기타' : `${areas[i]}${names[areas[i]] ? ' · ' + names[areas[i]] : ''}`, ty: b.y - 10}));
+  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: n.title.slice(0, 24), sub: n.sub, src: n.src}));
+  D.lines = lines;
+  D.meta.viewBox = [Math.ceil(marginL + Math.max(...rowBox.map(b => b.w)) + 40), Math.ceil(y + 30)];
+  D.meta.minWidth = Math.max(D.meta.minWidth || 0, 1100);
   delete D.edges;
 }
 
@@ -1114,11 +1248,42 @@ function renderViewer(D) {
   const start = M.defaultSelect && ST[M.defaultSelect] ? M.defaultSelect : Object.keys(ST).find(k => !ST[k].info);
   if (start) select(start); else { panel.innerHTML = chipsHTML(null); wire(); }
 }
-function showResult(D, fromSaved) {
-  $('#result').hidden = false; renderViewer(D);
+/* A result is a bundle of tabs: the main stream first, other systems after it.
+   A plain flow JSON (skill output, older saves) opens as a one-tab bundle. */
+function asBundle(x) {
+  if (x && Array.isArray(x.tabs)) return x;
+  return {kind: 'bundle', title: (x.meta || {}).title || '흐름도', tabs: [{key: 'main', label: (x.meta || {}).main ? 'Main Stream' : ((x.meta || {}).title || '흐름도'), main: !!(x.meta || {}).main, flow: x}], active: 0};
+}
+async function prepFlow(D) {   // a flow given as topology only (nodes + edges, no drawing) is laid out on first open
+  if (!D.lines && D.edges) { await loadScript(CDN.dagre); layout(D); }
+  return D;
+}
+async function showBundle(B, fromSaved) {
+  S.bundle = asBundle(B); const tab = S.bundle.tabs[S.bundle.active || 0] || S.bundle.tabs[0];
+  for (const t of S.bundle.tabs) await prepFlow(t.flow);
+  S.result = tab.flow;
+  $('#result').hidden = false; renderTabs(); renderViewer(tab.flow);
   if (EQ.rows.length) { linkEquipmentToFlow(); renderEquipment(); }
-  $('#r-status').textContent = fromSaved ? '저장된 흐름도를 열었습니다. Claude를 부르지 않았습니다.' : (D.meta.generated ? `생성: ${new Date(D.meta.generated.at).toLocaleString('ko-KR')} · Claude ${D.meta.generated.calls}회` : '');
-  $('#r-save').disabled = !DB; $('#result').scrollIntoView({behavior: 'smooth', block: 'start'});
+  const g = tab.flow.meta && tab.flow.meta.generated;
+  $('#r-status').textContent = fromSaved ? '저장된 흐름도를 열었습니다. Claude를 부르지 않았습니다.' : (g ? `생성: ${new Date(g.at).toLocaleString('ko-KR')} · Claude ${g.calls}회` : '');
+  $('#r-save').disabled = !DB; updateGen();
+  if (!S.tabSwitch) $('#result').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+function showResult(D, fromSaved) { return showBundle(asBundle(D), fromSaved); }
+function renderTabs() {
+  const B = S.bundle, bar = $('#r-tabs');
+  bar.hidden = !B || B.tabs.length < 2 && !B.tabs[0].main;
+  bar.innerHTML = (B ? B.tabs : []).map((t, i) => `<button type="button" role="tab" id="tab-${i}" aria-selected="${i === (B.active || 0)}" tabindex="${i === (B.active || 0) ? 0 : -1}" data-tab="${i}">${t.main ? '<span class="k">MAIN</span>' : ''}${esc(t.label)}</button>`).join('');
+  bar.querySelectorAll('[data-tab]').forEach(b => {
+    b.onclick = () => switchTab(+b.dataset.tab);
+    b.onkeydown = e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const n = (+b.dataset.tab + (e.key === 'ArrowRight' ? 1 : -1) + B.tabs.length) % B.tabs.length; switchTab(n); $('#tab-' + n).focus(); } };
+  });
+}
+async function switchTab(i) {
+  if (!S.bundle || i === S.bundle.active) return;
+  S.bundle.active = i; S.tabSwitch = true;
+  try { await showBundle(S.bundle, true); } finally { S.tabSwitch = false; }
+  $('#r-status').textContent = `${S.bundle.tabs[i].label} 탭`;
 }
 
 /* =====================================================================
@@ -1140,30 +1305,31 @@ async function refreshSaved() {
     const docs = q.docs.filter(d => (d.data() || {}).kind === 'flow');
     $('#saved-list').innerHTML = docs.length ? docs.map(d => { const x = d.data(); return `<li><span><span class="t">${esc(x.title)}</span><br><span class="muted">${new Date(x.createdAt).toLocaleString('ko-KR')} · ${esc(x.files || '')}</span></span><span class="row" style="flex-wrap:nowrap"><button type="button" class="link" data-open="${esc(d.id)}">열기</button><button type="button" class="link" data-del="${esc(d.id)}">삭제</button></span></li>`; }).join('')
       : '<li class="muted">아직 저장한 흐름도가 없습니다. 생성한 뒤 "저장"을 누르면 여기에 남습니다.</li>';
-    $('#saved-list').querySelectorAll('[data-open]').forEach(b => b.onclick = async () => { const s = await DB.collection('data/users/' + UID).doc(b.dataset.open).get(); if (s.exists) { S.result = JSON.parse(s.data().data); showResult(S.result, true); } });
+    $('#saved-list').querySelectorAll('[data-open]').forEach(b => b.onclick = async () => { const s = await DB.collection('data/users/' + UID).doc(b.dataset.open).get(); if (s.exists) showBundle(JSON.parse(s.data().data), true); });
     $('#saved-list').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (b.dataset.armed) { await DB.collection('data/users/' + UID).doc(b.dataset.del).delete(); refreshSaved(); }
       else { b.dataset.armed = '1'; b.textContent = '정말 삭제'; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = '삭제'; } }, 4000); } });
   } catch (e) { $('#saved-list').innerHTML = '<li class="muted">저장 목록을 불러오지 못했습니다.</li>'; }
 }
 async function saveResult() {
-  if (!DB || !S.result) return;
-  const body = JSON.stringify(S.result);
+  if (!DB || !S.bundle) return;
+  const body = JSON.stringify(S.bundle);
   if (body.length > 240000) { $('#r-status').textContent = '흐름도가 너무 커서 저장 목록에 넣지 못했습니다. JSON으로 내려받아 주세요.'; return; }
   try {
-    await DB.collection('data/users/' + UID).doc('flow-' + Date.now()).set({kind: 'flow', title: S.result.meta.title || '흐름도', createdAt: Date.now(), files: (S.result.meta.sheets || []).map(x => x.file).filter((v, i, a) => a.indexOf(v) === i).join(', ').slice(0, 200), data: body});
+    await DB.collection('data/users/' + UID).doc('flow-' + Date.now()).set({kind: 'flow', title: S.bundle.title || S.result.meta.title || '흐름도', createdAt: Date.now(), files: S.bundle.tabs.flatMap(t => (t.flow.meta.sheets || []).map(x => x.file)).filter((v, i, a) => a.indexOf(v) === i).join(', ').slice(0, 200), data: body});
     $('#r-status').textContent = '저장했습니다. 다시 열 때는 Claude를 부르지 않습니다.'; refreshSaved();
   } catch (e) { $('#r-status').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : '') + '. JSON으로 내려받아 주세요.'; }
 }
 async function downloadResult() {
-  if (!S.result) return;
+  if (!S.bundle) return;
   const dl = window.claude ? await window.claude.use('downloads') : null;
-  const name = (S.result.meta.title || 'pfd-flow').replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  const name = (S.bundle.title || 'pfd-flow').replace(/[\\/:*?"<>|]/g, '_') + '.json';
   if (!dl) { $('#r-status').textContent = '이 화면에서는 파일 내려받기를 쓸 수 없습니다.'; return; }
-  try { await dl.save({filename: name, data: JSON.stringify(S.result, null, 1)}); } catch (e) { if (e && e.code !== 'declined') $('#r-status').textContent = '내려받지 못했습니다.'; }
+  try { await dl.save({filename: name, data: JSON.stringify(S.bundle.tabs.length === 1 ? S.bundle.tabs[0].flow : S.bundle, null, 1)}); } catch (e) { if (e && e.code !== 'declined') $('#r-status').textContent = '내려받지 못했습니다.'; }
 }
 function openJson(file) {
-  file.text().then(t => { const D = JSON.parse(t); if (!D.streams || !(D.nodes || D.lines)) throw new Error('흐름도 데이터가 아닙니다'); S.result = D; showResult(D, true); })
+  file.text().then(t => { const D = JSON.parse(t); const ok = f => f && f.streams && (f.nodes || f.lines);
+    if (!(D.tabs ? D.tabs.every(x => ok(x.flow)) : ok(D))) throw new Error('흐름도 데이터가 아닙니다'); return showBundle(D, true); })
     .catch(e => say('JSON을 열지 못했습니다: ' + (e.message || e), 'bad'));
 }
 
@@ -1388,7 +1554,7 @@ function buildEquipment() {
       : twin.length ? `Tag 오기로 보임 — 같은 번호의 ${twin.join(', ')}가 도면에 있음` : `${a} Area 도면은 입력에 있는데 설비로 그려져 있지 않음 (문구·주석에만 언급)`;
     return {tag: t, sheets: [...cited[t]].join(', '), why};
   });
-  EQ.rows = rows; EQ.areaNames = areaNames;
+  EQ.rows = rows; EQ.areaNames = areaNames; EQ.sample = null;
   linkEquipmentToFlow();
 }
 
@@ -1402,32 +1568,40 @@ function streamTags(text) {
   return out;
 }
 function linkEquipmentToFlow() {
-  const D = S.result, inl = {}, outl = {};
   EQ.rows.forEach(r => { delete r.mb; });
   EQ.mbTitle = '';
-  if (!D || !D.streams) return;
+  const tabs = S.bundle ? S.bundle.tabs : S.result ? [{label: (S.result.meta || {}).title || '흐름도', flow: S.result}] : [];
+  if (!tabs.length) return;
   const add = (m, t, id) => { (m[t] = m[t] || []).includes(id) || m[t].push(id); };
-  (D.edges || D.links || []).forEach(e => { streamTags(e.from).forEach(t => add(outl, t, e.id)); streamTags(e.to).forEach(t => add(inl, t, e.id)); });
-  for (const [id, s] of Object.entries(D.streams)) { if (!s.v) continue; streamTags(s.from).forEach(t => add(outl, t, id)); streamTags(s.to).forEach(t => add(inl, t, id)); }
   const num = v => { const x = numParse(v, false); return Number.isFinite(x) ? x : null; };
-  let n = 0;
+  // per tab: which streams start (out) and end (in) at each tag; the main stream tab is read first
+  const maps = tabs.filter(t => t.flow && t.flow.streams).map(t => {
+    const D = t.flow, inl = {}, outl = {};
+    (D.edges || D.links || []).forEach(e => { streamTags(e.from).forEach(x => add(outl, x, e.id)); streamTags(e.to).forEach(x => add(inl, x, e.id)); });
+    for (const [id, st] of Object.entries(D.streams)) { if (!st.v) continue; streamTags(st.from).forEach(x => add(outl, x, id)); streamTags(st.to).forEach(x => add(inl, x, id)); }
+    return {label: t.label, D, inl, outl};
+  });
+  const used = new Set();
   for (const r of EQ.rows) {
     if (r.untagged) continue;
     const key = r.tag.replace(/^[A-Z]{1,3}-(?=\d{4})/, ''), code = (key.match(/\d{4}-([A-Z]+)-/) || [])[1];
-    const ins = (inl[key] || []).filter(id => D.streams[id] && D.streams[id].v), outs = (outl[key] || []).filter(id => D.streams[id] && D.streams[id].v);
-    const basis = EQ_MOVERS.has(code) ? (outs.length ? outs : ins) : (ins.length ? ins : outs);
-    if (!basis.length) continue;
-    const vs = basis.map(id => D.streams[id].v);
-    const total = (k, alt) => { const xs = vs.map(v => num(v[k]) ?? num(v[alt])).filter(x => x !== null); return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) * 1000) / 1000 : ''; };
-    const span = k => { const xs = [...new Set(vs.map(v => num(v[k])).filter(x => x !== null))].sort((a, b) => a - b); return !xs.length ? '' : xs.length === 1 ? xs[0] : `${xs[0]}–${xs[xs.length - 1]}`; };
-    const cats = D.categories || {};
-    r.mb = {in: ins.join(', '), out: outs.join(', '), basis: basis.join(', '),
-      fluid: [...new Set(basis.map(id => (cats[D.streams[id].cat] || {}).label || ''))].filter(Boolean).join(', '),
-      dm: total('dm'), nm: total('nm'), dx: total('dxm', 'dsm'), T: span('T'), P: span('P'), rho: span('rho'), sol: span('sol')};
-    if (basis.length > 1) r.mb.note = `기준 Stream ${basis.length}개 합산`;
-    n++;
+    for (const m of maps) {
+      const D = m.D, has = id => D.streams[id] && D.streams[id].v;
+      const ins = (m.inl[key] || []).filter(has), outs = (m.outl[key] || []).filter(has);
+      const basis = EQ_MOVERS.has(code) ? (outs.length ? outs : ins) : (ins.length ? ins : outs);
+      if (!basis.length) continue;
+      const vs = basis.map(id => D.streams[id].v);
+      const total = (k, alt) => { const xs = vs.map(v => num(v[k]) ?? num(v[alt])).filter(x => x !== null); return xs.length ? Math.round(xs.reduce((p, q) => p + q, 0) * 1000) / 1000 : ''; };
+      const span = k => { const xs = [...new Set(vs.map(v => num(v[k])).filter(x => x !== null))].sort((p, q) => p - q); return !xs.length ? '' : xs.length === 1 ? xs[0] : `${xs[0]}–${xs[xs.length - 1]}`; };
+      const cats = D.categories || {};
+      r.mb = {tab: m.label, in: ins.join(', '), out: outs.join(', '), basis: basis.join(', '),
+        fluid: [...new Set(basis.map(id => (cats[D.streams[id].cat] || {}).label || ''))].filter(Boolean).join(', '),
+        dm: total('dm'), nm: total('nm'), dx: total('dxm', 'dsm'), T: span('T'), P: span('P'), rho: span('rho'), sol: span('sol')};
+      if (basis.length > 1) r.mb.note = `기준 Stream ${basis.length}개 합산`;
+      used.add(m.label); break;
+    }
   }
-  EQ.mbTitle = n ? (D.meta && D.meta.title) || '흐름도' : '';
+  EQ.mbTitle = [...used].join(', ');
 }
 
 const rowFlags = r => [...r.flags, ...(r.mb && r.mb.note ? [r.mb.note] : [])].join('; ');
@@ -1449,7 +1623,7 @@ function renderEquipment() {
   const cnt = k => EQ.rows.filter(r => r.status.startsWith(k)).length;
   $('#eq-counts').innerHTML = EQ.rows.length ? [['설비', EQ.rows.length], ['운전', cnt('운전')], ['예비', cnt('예비')], ['향후', cnt('향후')], ['미확인(Tag 없음)', cnt('미확인')], ['그중 그림 판독', EQ.rows.filter(r => r.vision).length],
     ['확인 필요', EQ.rows.filter(r => rowFlags(r) && !r.untagged).length], ['도면 미포함 참조', EQ.refsMissing.length]]
-    .map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('') + (EQ.mbTitle ? `<span>물질수지 값: <b>${esc(EQ.mbTitle)}</b> 흐름도에서 ${EQ.rows.filter(r => r.mb).length}건</span>` : '') + (q ? `<span>찾은 행 <b>${rows.length}</b></span>` : '') : '';
+    .map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join('') + (EQ.mbTitle ? `<span>물질수지 값: <b>${esc(EQ.mbTitle)}</b> 탭에서 ${EQ.rows.filter(r => r.mb).length}건</span>` : '') + (q ? `<span>찾은 행 <b>${rows.length}</b></span>` : '') : '';
   const mb = EQ.rows.some(r => r.mb);
   const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
   const stCls = s => s === '미확인' ? 'st-unk' : s.startsWith('예비') || s.startsWith('향후') ? 'st-sb' : '';
@@ -1552,7 +1726,7 @@ $('#eq-vis-stop').onclick = () => VIS.ctl && VIS.ctl.abort();
 async function openPfd(r) {
   if (!r) return;
   const sh = S.sheets.find(s => s.key === r.sheetKey);
-  if (!sh) { say('이 설비의 PFD 파일이 지금 입력에 없습니다.', 'warn'); return; }
+  if (!sh) { $('#eq-stage').textContent = EQ.sample ? '실적 샘플에는 원본 PDF가 들어 있지 않습니다. 같은 PDF를 올리면 도면을 열 수 있습니다.' : '이 설비의 PFD 파일이 지금 입력에 없습니다.'; return; }
   const win = (() => { try { return window.open('', '_blank', 'width=1400,height=900'); } catch (e) { return null; } })();
   if (win) win.document.write('<!doctype html><meta charset="utf-8"><title>PFD 여는 중…</title><body style="font:14px system-ui;padding:24px">PFD를 그리는 중입니다…</body>');
   let url;
@@ -1616,9 +1790,9 @@ async function downloadEquipment() {
   await loadScript(CDN.xlsx);
   const mb = EQ.rows.some(r => r.mb);
   const head = ['No.', 'Area', 'Tag No.', 'Equipment Name (도면 원문)', '종류', '운전 구분', '비고 (도면 표기)', 'Nom. Vol. (m³)', 'PFD 도면 번호', 'PDF 파일', 'PDF 쪽', '도면 구역 (행-열)',
-    ...(mb ? ['입구 Stream', '출구 Stream', '기준 Stream', '유체', '일 유량 (t/d)', 'Nominal 평균 (t/h)', 'Design 최대 (t/h)', '운전 온도 (°C)', '운전 압력 (bar)', '밀도 (t/m³)', '고형분 (%)'] : []), '확인 필요'];
+    ...(mb ? ['값 출처 탭', '입구 Stream', '출구 Stream', '기준 Stream', '유체', '일 유량 (t/d)', 'Nominal 평균 (t/h)', 'Design 최대 (t/h)', '운전 온도 (°C)', '운전 압력 (bar)', '밀도 (t/m³)', '고형분 (%)'] : []), '확인 필요'];
   const aoa = [head, ...EQ.rows.map((r, i) => [i + 1, r.area, r.tag, r.name, r.kind, r.status, r.note, r.vol, r.dwg, r.file, r.page, r.zone,
-    ...(mb ? (r.mb ? [r.mb.in, r.mb.out, r.mb.basis, r.mb.fluid, r.mb.dm, r.mb.nm, r.mb.dx, r.mb.T, r.mb.P, r.mb.rho, r.mb.sol] : Array(11).fill('')) : []), rowFlags(r)])];
+    ...(mb ? (r.mb ? [r.mb.tab, r.mb.in, r.mb.out, r.mb.basis, r.mb.fluid, r.mb.dm, r.mb.nm, r.mb.dx, r.mb.T, r.mb.P, r.mb.rho, r.mb.sol] : Array(12).fill('')) : []), rowFlags(r)])];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = head.map(h => ({wch: /Name/.test(h) ? 44 : /도면 번호|확인/.test(h) ? 32 : /파일|유체/.test(h) ? 22 : Math.max(8, Math.min(16, h.length + 2))}));
   ws['!autofilter'] = {ref: XLSX.utils.encode_range({s: {r: 0, c: 0}, e: {r: aoa.length - 1, c: head.length - 1}})};
@@ -1637,14 +1811,14 @@ async function downloadEquipment() {
   const ws3 = XLSX.utils.aoa_to_sheet([['Tag No.', '언급된 시트', '판단'], ...EQ.refsMissing.map(x => [x.tag, x.sheets, x.why])]);
   ws3['!cols'] = [{wch: 15}, {wch: 40}, {wch: 70}]; XLSX.utils.book_append_sheet(wb, ws3, '도면 미포함 설비');
   const basis = [['항목', '기준'],
-    ['입력', S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
+    ['입력', EQ.sample ? `실적 샘플: ${EQ.sample.file} (${EQ.sample.sheets}장)` : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => `${e.file.name} (${e.pages}장)`).join(', ')],
     ['설비 판별', '설비 이름 아래에 단독으로 적힌 Tag(NNNN-XX-NNN, 앞에 WF- 같은 접두가 붙을 수 있음)를 설비로 본다. 괄호·FROM/TO 문구·주석 속 Tag는 다른 시트 설비를 가리키는 참조라 "도면 미포함 설비" 탭에서 따로 본다.'],
     ['이름', '도면 원문 그대로. 이름 하나 아래 Tag가 여럿이면 "PUMP 1/2", "A/B", "2@8" 표기를 Tag 순서대로 나눠 붙였다.'],
     ['운전 구분', '(STAND-BY)·(SPARE)는 묶음의 마지막 Tag(또는 그 표시가 옆에 붙은 Tag)에, (FUTURE)는 묶음 전체에. 표시가 없으면 운전. Tag 없이 이름만 있는 설비 후보는 "미확인".'],
     ['도면 구역', '도면 테두리 격자(위쪽 열 번호, 왼쪽 행 문자)로 Tag 글자(미확인은 이름 글자) 위치를 "행-열"로 적었다.'],
     ['미확인(Tag 없음)', '도면 글자에서 설비 이름만 있고 Tag가 없는 것을 찾은 후보다. 이름이 "(그림)"으로 시작하는 행은 "그림으로 설비 찾기"에서 Claude가 도면 이미지를 보고 찾은, 글자 없이 기호로만 그려진 설비 후보이며 확인 필요 열에 신뢰도를 적었다. 트럭·창고·피트·방류벽은 넣지 않았다.'],
     ['그림 대조', `${S.sheets.filter(sh => sh.eqVision).length}/${S.sheets.length}장 실행`],
-    ['물질수지 값', mb ? `"${EQ.mbTitle}" 흐름도의 Stream 값. 펌프·팬·압축기·보일러는 출구, 그 밖은 입구 Stream 기준이며 여러 개면 유량 합산, 온도·압력은 범위.` : '흐름도를 생성하거나 열면 그 계통 설비에 Stream 값이 채워진다.'],
+    ['물질수지 값', mb ? `흐름도 탭(${EQ.mbTitle})의 Stream 값. 메인 흐름 탭을 먼저 보고, 없으면 다른 탭 값을 쓴다. 펌프·팬·압축기·보일러는 출구, 그 밖은 입구 Stream 기준이며 여러 개면 유량 합산, 온도·압력은 범위.` : '흐름도를 생성하거나 열면 그 계통 설비에 Stream 값이 채워진다.'],
     ['만든 때', new Date().toLocaleString('ko-KR')]];
   const ws4 = XLSX.utils.aoa_to_sheet(basis); ws4['!cols'] = [{wch: 18}, {wch: 110}]; XLSX.utils.book_append_sheet(wb, ws4, '작성 기준');
   const buf = XLSX.write(wb, {bookType: 'xlsx', type: 'array', compression: true});
@@ -1670,12 +1844,33 @@ drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add(
 drop.addEventListener('dragleave', () => drop.classList.remove('over'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); addFiles([...e.dataTransfer.files]); });
 $('#system').addEventListener('input', updateGen);
-$('#system').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#gen').disabled) generate(); });
-$('#gen').onclick = generate;
+$('#system').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#gen').disabled) generate('all'); });
+$('#gen').onclick = () => generate('all');
 $('#stop').onclick = () => S.ctl && S.ctl.abort();
 $('#open-json').onclick = () => $('#json-file').click();
 $('#json-file').onchange = e => { if (e.target.files[0]) openJson(e.target.files[0]); e.target.value = ''; };
-$('#demo').onclick = () => { S.result = JSON.parse($('#demo-data').textContent); showResult(S.result, true); $('#r-status').textContent = '예시(가상 데이터)입니다.'; };
+$('#demo').onclick = async () => { await showResult(JSON.parse($('#demo-data').textContent), true); $('#r-status').textContent = '예시(가상 데이터)입니다.'; };
+/* Real-data sample: only in builds made with `build.py --sample` (kept out of the public repository). */
+const SAMPLE_DATA = (() => { try { return JSON.parse($('#sample-data').textContent); } catch (e) { return null; } })();
+if (SAMPLE_DATA && (SAMPLE_DATA.bundle || SAMPLE_DATA.flow)) {
+  $('#sample').hidden = false; $('#sample').textContent = (SAMPLE_DATA.label || '실적 샘플') + ' 보기';
+  $('#sample-note').hidden = false; $('#sample-note').textContent = SAMPLE_DATA.note || '';
+}
+$('#sample').onclick = async () => {
+  if (!SAMPLE_DATA) return;
+  const E = SAMPLE_DATA.equipment;
+  if (E && E.rows && !S.sheets.length) {
+    EQ.rows = JSON.parse(JSON.stringify(E.rows)); EQ.refsMissing = E.refsMissing || []; EQ.areaNames = E.areaNames || {};
+    EQ.sample = {file: E.file, sheets: E.sheets}; EQ.state = 'done'; EQ.q = ''; $('#eq-q').value = '';
+    eqProgress(100, `${SAMPLE_DATA.label || '실적 샘플'} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
+  }
+  await showBundle(JSON.parse(JSON.stringify(SAMPLE_DATA.bundle || SAMPLE_DATA.flow)), true);
+  $('#r-status').textContent = `${SAMPLE_DATA.label || '실적 샘플'}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다.`;
+  renderEquipment();
+};
+$('#r-add').onclick = () => generate('add');
+$('#r-sys').addEventListener('input', updateGen);
+$('#r-sys').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('#r-add').disabled) generate('add'); });
 $('#r-new').onclick = () => { $('#result').hidden = true; window.scrollTo({top: 0, behavior: 'smooth'}); };
 $('#r-save').onclick = saveResult;
 $('#r-dl').onclick = downloadResult;
