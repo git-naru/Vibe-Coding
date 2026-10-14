@@ -886,6 +886,7 @@ async function buildFlow(system, isMain, maxImg) {
   // ---- assemble + checks + layout
   setStep('check', 'run');
   const D = assemble({system, sc, cats, topo, vals, main, side});
+  if (isMain) D.meta.main = true;   // the row-per-area layout keys on this
   setStep('check', 'done', `${D.checks.length}개 검사 · 시트 간 차이 ${D._diffs}건`);
   setStep('draw', 'run'); await loadScript(CDN.dagre); layout(D); setStep('draw', 'done', `설비 ${D.nodes.length}개 · 라인 ${D.lines.length}개`);
   delete D._diffs; D.meta.generated = {at: new Date().toISOString(), calls};
@@ -1032,19 +1033,109 @@ function assemble({system, sc, cats, topo, vals, main, side}) {
 }
 
 /* Layered layout (dagre) → node boxes, polylines and badge positions in the viewer format. */
-function layout(D) {
+/* Layout. Small systems: one left-to-right dagre graph. A main stream (or any flow that would run
+   very wide) is laid out one process area per row, rows stacked top to bottom in flow order; links
+   between neighbouring rows run in the gap between them, recycles and row-skipping links run in lanes
+   down the left margin. */
+const NODE_SIZE = n => n.src ? [170, 46] : [190, 64];
+function areaOf(n) {
+  const t = String(n.id || '').match(/^(?:[A-Z]{1,3}-)?(\d{4})-[A-Z]{2,4}-\d/);
+  if (t) return t[1];
+  const d = String(n.sheet || n.id || '').match(/(?:^|[-:])(\d{4})-[A-Z]{2}-(?:PFD|PID|P&ID)/);
+  return d ? d[1] : null;
+}
+function dagreLayout(nodes, edges, opts) {
   const g = new dagre.graphlib.Graph({multigraph: true});
-  g.setGraph({rankdir: 'LR', nodesep: 26, ranksep: 90, edgesep: 14, marginx: 24, marginy: 24});
+  g.setGraph({rankdir: 'LR', nodesep: 26, ranksep: 90, edgesep: 14, marginx: 0, marginy: 0, ...(opts || {})});
   g.setDefaultEdgeLabel(() => ({}));
-  const size = n => n.src ? [170, 46] : [190, 64];
-  D.nodes.forEach(n => { const [w, h] = size(n); g.setNode(n.id, {width: w, height: h}); });
-  D.edges.forEach((e, i) => g.setEdge(e.from, e.to, {width: 20 + (D.streams[e.id].label || e.id).length * 8, height: 22, labelpos: 'c'}, 'e' + i));
+  nodes.forEach(n => { const [w, h] = NODE_SIZE(n); g.setNode(n.id, {width: w, height: h}); });
+  edges.forEach(e => g.setEdge(e.from, e.to, {width: e.lw, height: 22, labelpos: 'c'}, e.key));
   dagre.layout(g);
+  return g;
+}
+const midOf = pts => { let best = 0, bi = 0; for (let i = 0; i < pts.length - 1; i++) { const l = Math.abs(pts[i + 1][0] - pts[i][0]) + Math.abs(pts[i + 1][1] - pts[i][1]); if (l > best) { best = l; bi = i; } } const [a, b] = [pts[bi], pts[bi + 1]]; return [Math.round((a[0] + b[0]) / 2), Math.round((a[1] + b[1]) / 2)]; };
+function layout(D) {
+  const edges = D.edges.map((e, i) => ({...e, key: 'e' + i, lw: 20 + (D.streams[e.id].label || e.id).length * 8}));
+  const g = dagreLayout(D.nodes, edges, {marginx: 24, marginy: 24});
   const gr = g.graph();
-  D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = size(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src}; });
-  D.lines = D.edges.map((e, i) => { const ed = g.edge({v: e.from, w: e.to, name: 'e' + i}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
-  D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
+  // area per node: tag or sheet; boxes without one (off-page, battery limit) join their neighbour's area
+  const area = {}; D.nodes.forEach(n => area[n.id] = areaOf(n));
+  for (let pass = 0; pass < 3; pass++) edges.forEach(e => { if (!area[e.from] && area[e.to]) area[e.from] = area[e.to]; if (!area[e.to] && area[e.from]) area[e.to] = area[e.from]; });
+  D.nodes.forEach(n => { if (!area[n.id]) area[n.id] = '?'; });
+  const areas = [...new Set(Object.values(area))];
+  const rows = areas.length >= 2 && (D.meta.main || gr.width > 1800);
   D.links = D.edges.map(e => ({id: e.id, from: e.from, to: e.to}));   // equipment ends of each stream (the equipment list reads them)
+  if (!rows) {
+    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src}; });
+    D.lines = edges.map(e => { const ed = g.edge({v: e.from, w: e.to, name: e.key}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
+    D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
+    delete D.edges; return;
+  }
+  // rows in flow order (mean x in the one-line layout); '?' last
+  const meanX = a => { const xs = D.nodes.filter(n => area[n.id] === a).map(n => g.node(n.id).x); return xs.reduce((p, q) => p + q, 0) / xs.length; };
+  areas.sort((p, q) => (p === '?') - (q === '?') || meanX(p) - meanX(q));
+  const rowOf = {}; D.nodes.forEach(n => rowOf[n.id] = areas.indexOf(area[n.id]));
+  const sub = areas.map(a => {
+    const ns = D.nodes.filter(n => area[n.id] === a), es = edges.filter(e => area[e.from] === a && area[e.to] === a);
+    return {a, ns, es, g: dagreLayout(ns, es, {ranksep: 70})};
+  });
+  // lanes: below each row (links leaving it downward or to the margin), above each row (margin links arriving), left margin
+  const cross = edges.filter(e => rowOf[e.from] !== rowOf[e.to]);
+  const below = areas.map(() => []), above = areas.map(() => []), left = [];
+  cross.forEach(e => { const r = rowOf[e.from], t = rowOf[e.to]; below[r].push(e); if (t !== r + 1) { above[t].push(e); left.push(e); } });
+  const LANE = 12, PAD = 34, marginL = 30 + left.length * LANE, TOP = 36;
+  let y = TOP; const rowBox = [];
+  sub.forEach((r, i) => {
+    const gg = r.g.graph(), h = Math.max(gg.height, 50);
+    if (i) y += PAD + below[i - 1].length * LANE + above[i].length * LANE + 22;
+    rowBox.push({x: marginL, y, w: gg.width, h}); y += h;
+  });
+  const pos = {};
+  sub.forEach((r, i) => r.ns.forEach(n => { const p = r.g.node(n.id), [w, h] = NODE_SIZE(n); pos[n.id] = {x: Math.round(rowBox[i].x + p.x - w / 2), y: Math.round(rowBox[i].y + p.y - h / 2), w, h}; }));
+  const lines = [];
+  sub.forEach((r, i) => r.es.forEach(e => {
+    const ed = r.g.edge({v: e.from, w: e.to, name: e.key}), bx = rowBox[i], A = pos[e.from], B = pos[e.to];
+    const pts = ed.points.map(p => [Math.round(bx.x + p.x), Math.round(bx.y + p.y)]), k = pts.length - 1;
+    // dagre clips a steep edge at the box top/bottom, and the slanted run can cut the corner of a box
+    // stacked next to it; forward edges leave from the right side and enter on the left instead
+    if (k > 1 && pts[1][0] > A.x + A.w) pts[0] = [A.x + A.w, Math.round(A.y + A.h / 2)];
+    if (k > 1 && pts[k - 1][0] < B.x) pts[k] = [B.x, Math.round(B.y + B.h / 2)];
+    lines.push({s: e.id, pts, lab: [Math.round(bx.x + ed.x), Math.round(bx.y + ed.y)], dashed: e.unc});
+  }));
+  // spread several links leaving / entering the same box side
+  const outs = {}, ins = {}; cross.forEach(e => { (outs[e.from] = outs[e.from] || []).push(e); (ins[e.to] = ins[e.to] || []).push(e); });
+  const spread = (list, e, w) => { const k = list.indexOf(e), n = list.length; return n < 2 ? 0 : Math.round((k - (n - 1) / 2) * Math.min(28, (w - 30) / (n - 1))); };
+  // a vertical drop from a box can hit another box of the same row (dagre stacks a row's nodes);
+  // then the link leaves the box side and drops in the nearest free column gap instead
+  const rowNodes = rowBox.map((_, i) => D.nodes.filter(n => rowOf[n.id] === i).map(n => pos[n.id]));
+  const hits = (i, x0, y0, x1, y1, skip) => rowNodes[i].some(b => b !== skip[0] && b !== skip[1] && Math.max(x0, x1) > b.x - 4 && Math.min(x0, x1) < b.x + b.w + 4 && Math.max(y0, y1) > b.y - 4 && Math.min(y0, y1) < b.y + b.h + 4);
+  const sideX = (i, box, my, yEdge, dir) => {   // first x beside the box whose vertical run to the row edge is clear
+    for (let k = 0; k < 60; k++) { const x = dir > 0 ? box.x + box.w + 14 + k * 8 : box.x - 14 - k * 8;
+      if (!hits(i, x, my, x, yEdge, [box]) && !hits(i, dir > 0 ? box.x + box.w : x, my, dir > 0 ? x : box.x, my, [box])) return x; }
+    return dir > 0 ? box.x + box.w + 14 : box.x - 14;
+  };
+  cross.forEach(e => {
+    const A = pos[e.from], B = pos[e.to], r = rowOf[e.from], t = rowOf[e.to];
+    const sx = A.x + A.w / 2 + spread(outs[e.from], e, A.w), tx = B.x + B.w / 2 + spread(ins[e.to], e, B.w);
+    const rb = rowBox[r].y + rowBox[r].h, laneBelow = rb + 14 + below[r].indexOf(e) * LANE;
+    const laneIn = t === r + 1 ? laneBelow : rowBox[t].y - 14 - above[t].indexOf(e) * LANE;
+    let out, inn;
+    if (!hits(r, sx, A.y + A.h, sx, rb + 2, [A])) out = [[sx, A.y + A.h], [sx, laneBelow]];
+    else { const my = A.y + A.h / 2, x = sideX(r, A, my, rb + 2, 1); out = [[A.x + A.w, my], [x, my], [x, laneBelow]]; }
+    if (!hits(t, tx, rowBox[t].y - 2, tx, B.y, [B])) inn = [[tx, laneIn], [tx, B.y]];
+    else { const my = B.y + B.h / 2, x = sideX(t, B, my, rowBox[t].y - 2, -1); inn = [[x, laneIn], [x, my], [B.x, my]]; }
+    let pts;
+    if (t === r + 1) pts = [...out, ...inn];
+    else { const xl = 18 + left.indexOf(e) * LANE; pts = [...out, [xl, laneBelow], [xl, laneIn], ...inn]; }
+    pts = pts.map(p => [Math.round(p[0]), Math.round(p[1])]);
+    lines.push({s: e.id, pts, lab: midOf(pts), dashed: e.unc});
+  });
+  const names = {}; (S.sheets || []).forEach(sh => { if (sh.area && sh.area.code && sh.area.name) names[sh.area.code] = sh.area.name; });
+  D.frames = rowBox.map((b, i) => ({x: b.x - 12, y: b.y - 26, w: b.w + 24, h: b.h + 36, title: areas[i] === '?' ? '기타' : `${areas[i]}${names[areas[i]] ? ' · ' + names[areas[i]] : ''}`, ty: b.y - 10}));
+  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: n.title.slice(0, 24), sub: n.sub, src: n.src}));
+  D.lines = lines;
+  D.meta.viewBox = [Math.ceil(marginL + Math.max(...rowBox.map(b => b.w)) + 40), Math.ceil(y + 30)];
+  D.meta.minWidth = Math.max(D.meta.minWidth || 0, 1100);
   delete D.edges;
 }
 
