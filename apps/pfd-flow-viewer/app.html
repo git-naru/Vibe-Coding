@@ -265,6 +265,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:520px){.f2{grid-template-columns:1fr}}
 .estlist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.qtyadd input{font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);flex:1 1 140px;max-width:260px}
+.qtyadd input#qa-qty,.qtyadd input#qa-unit{flex:0 1 90px}
+.ecrefs{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px}
+.ecrefs .chk{display:inline-flex;gap:6px;align-items:center}
+.eqt tr.skip td{color:var(--muted);text-decoration:line-through}
+.eqt tr.skip td.cost,.eqt tr.skip td:has(select){text-decoration:none}
+.eqt select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink)}
+#estc h3{margin:4px 0 0}
+#rate-cur,#qexp{flex:none}
 /* ---- detail frame: every equipment and line, scrolls on its own beside the diagram ---- */
 .detail{background:var(--panel);border:1px solid var(--rule);border-radius:6px;display:flex;flex-direction:column;min-width:0;position:sticky;top:12px;height:calc(100vh - 24px);height:calc(100dvh - 24px);overflow:hidden}
 .d-head{padding:12px 14px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:8px;flex:none}
@@ -313,8 +322,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <button type="button" class="half est" id="go-est" aria-describedby="home-est-d">
       <span class="num">02 · 실적 활용</span>
       <span class="h">투자비 산출</span>
-      <span class="d" id="home-est-d">새 프로젝트의 공정 Data를 넣으면 쌓인 실적과 설비·용량을 비교해 투자비를 산출합니다.</span>
-      <span class="pill">다음 단계에서 구현</span>
+      <span class="d" id="home-est-d">새 프로젝트의 PFD를 넣으면 쌓인 실적의 유사 설비로 설비비(용량비 지수·실적 단가)를, 학습한 공사물량 × 회사 단가로 공사비를 산출합니다.</span>
+      <span class="stat" id="home-est-stat"></span>
       <span class="go">투자비 산출로 →</span>
     </button>
   </div>
@@ -432,6 +441,29 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <p class="muted" style="margin:0">행을 두 번 누르거나(키보드는 Enter) 하면 그 설비가 있는 PFD를 새 창으로 열고 위치를 빨간 상자로 표시합니다. 노란 행은 Tag 없이 그려진 설비 후보(미확인)입니다. "그림으로 설비 찾기"는 글자 없이 기호로만 그려진 설비를 Claude가 도면 이미지로 찾아 미확인 후보에 더합니다(시트당 1회). 도면 구역은 도면 테두리 격자(행 A–G, 열 1–10)입니다. 설비비 칸을 누르면 금액을 직접 입력할 수 있고(비우면 매칭 금액으로 돌아감), "설비비 목록 올리기"로 수동 Equipment List를 올리면 Tag → 이름 순으로 자동 매칭합니다.</p>
     </section>
 
+    <section class="card" id="qty" hidden aria-label="공사물량 (실적)">
+      <div class="eqhead"><div class="eqstage"><h2>공사물량 (실적)</h2><span class="muted">설비·패키지별 실제 공사물량입니다. 투자비 산출이 이 실적에서 공종별 물량을 학습합니다.</span></div>
+        <div class="eqtools"><button type="button" id="qty-up" title="대상(Tag·패키지·공통) | 공종 | 물량 | 단위 머리글이 있는 Excel·CSV">공사물량 목록 올리기</button><input type="file" id="qty-file" accept=".xlsx,.xls,.csv" hidden></div></div>
+      <div class="row qtyadd"><input type="text" id="qa-target" list="qty-dl" placeholder="대상: Tag, 패키지 이름 또는 공통" aria-label="대상"><input type="text" id="qa-work" list="work-dl" placeholder="공종 (예: 배관)" aria-label="공종"><input type="text" id="qa-qty" inputmode="decimal" placeholder="물량" aria-label="물량"><input type="text" id="qa-unit" placeholder="단위" aria-label="단위"><button type="button" id="qa-add">추가</button></div>
+      <datalist id="qty-dl"></datalist><datalist id="work-dl"></datalist>
+      <div class="summary" id="qty-sum"></div>
+      <div class="eqwrap"><table class="eqt" id="qty-tbl"></table></div>
+      <div class="muted" id="qty-msg" aria-live="polite"></div>
+    </section>
+
+    <section class="card" id="estc" hidden aria-label="투자비 산출">
+      <div class="eqhead"><div class="eqstage"><h2>투자비 산출</h2><span class="muted" id="ec-st"></span></div>
+        <div class="eqtools"><button type="button" id="ec-run">실적 다시 불러와 계산</button><button type="button" class="primary" id="ec-xlsx">근거표 Excel</button></div></div>
+      <div class="ecrefs" id="ec-refs"></div>
+      <div class="summary" id="ec-sum"></div>
+      <h3>설비비 · 유사 실적 설비의 용량비 지수 / 실적 단가</h3>
+      <div class="eqwrap"><table class="eqt" id="ec-eq"></table></div>
+      <h3>공사비 · 학습 물량 × 회사 공사 단가</h3>
+      <div class="tblwrap"><table class="tbl" id="ec-wk"></table></div>
+      <div class="muted" id="ec-msg" aria-live="polite"></div>
+      <p class="muted" style="margin:0">용량·설비비·물량 칸을 누르면 직접 고칠 수 있고(✎ 표시, 비우면 산출값), 적용 방법을 설비마다 고를 수 있습니다. 지수와 공사 단가는 "투자비 산출" 화면에서 관리합니다.</p>
+    </section>
+
     <section id="result" hidden aria-label="흐름도">
       <div class="toolbar">
         <div class="muted" id="r-status"></div>
@@ -481,23 +513,32 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <header>
       <div class="eyebrow">02 · 투자비 산출</div>
       <h1>투자비 산출</h1>
-      <p class="lede">산출할 프로젝트의 PFD(Mass Balance 포함)를 넣으면 쌓인 실적과 비교해 투자비를 뽑는 화면입니다. 다음 단계에서 구현합니다.</p>
+      <p class="lede">산출할 프로젝트의 PFD(Mass Balance 포함)를 넣으면 흐름도와 Equipment List를 만들고, 쌓인 실적에서 같은 종류·가까운 용량의 설비를 찾아 용량비 지수와 실적 단가로 설비비를, 실적에서 학습한 공사물량 × 회사 공사 단가로 공사비를 산출합니다.</p>
     </header>
     <div class="cols">
+      <section class="card" aria-label="산출 프로젝트">
+        <div class="toolbar"><h2>산출 프로젝트 <span class="muted" id="est-count"></span></h2><div class="btns"><button type="button" class="primary" id="est-new">새 산출</button></div></div>
+        <div class="projgrid" id="est-list"><div class="empty">불러오는 중…</div></div>
+      </section>
       <section class="card" aria-label="쌓인 실적">
         <h2>쌓인 실적</h2>
         <div class="summary" id="est-sum"></div>
         <div class="tblwrap"><table class="tbl" id="est-tbl"></table></div>
-      </section>
-      <section class="card" aria-label="구현 예정">
-        <h2>구현 예정 흐름</h2>
-        <ol class="estlist">
-          <li>산출할 프로젝트의 PFD·Mass Balance 입력</li>
-          <li>흐름도와 Equipment List 자동 생성 (실적 입력과 같은 방식)</li>
-          <li>쌓인 실적에서 비교할 프로젝트 선택, 설비·용량 대응</li>
-          <li>투자비 산출과 근거표 내려받기</li>
-        </ol>
         <button type="button" id="est-rec">실적 입력으로 가기</button>
+      </section>
+    </div>
+    <div class="cols">
+      <section class="card" id="rates" aria-label="공사 단가">
+        <div class="toolbar"><h2>공사 단가 (회사 기준)</h2><div class="btns"><label class="lab" for="rate-cur">통화·단위</label><input type="text" id="rate-cur" placeholder="예: 백만원" style="width:110px;font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink)"><button type="button" id="rate-up">단가표 올리기</button><input type="file" id="rate-file" accept=".xlsx,.xls,.csv" hidden><button type="button" id="rate-add">행 추가</button></div></div>
+        <div class="tblwrap" style="max-height:420px;overflow:auto"><table class="tbl" id="rate-tbl"></table></div>
+        <p class="muted" style="margin:0">공종 이름은 실적 공사물량의 공종 이름과 같아야 연결됩니다. 단가표 머리글: 공종 | 단위 | 단가.</p>
+        <div class="muted" id="rate-msg" aria-live="polite"></div>
+      </section>
+      <section class="card" id="exps" aria-label="산출 기준">
+        <h2>산출 기준</h2>
+        <p class="muted" style="margin:0">설비비 = 유사 실적 설비비 × (용량 / 실적 용량)<sup>n</sup>. 기본값은 일반 문헌의 대략값이니 회사 기준으로 바꾸세요.</p>
+        <div class="tblwrap" style="max-height:360px;overflow:auto"><table class="tbl" id="exp-tbl"></table></div>
+        <div class="row"><label class="lab" for="qexp">공사물량 지수</label><input type="text" id="qexp" inputmode="decimal" style="width:70px;font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink)"><button type="button" id="exp-reset">지수 기본값으로</button></div>
       </section>
     </div>
   </section>
@@ -1790,44 +1831,47 @@ async function initStore() {
     DB = null; $('#store-note').hidden = false;
     $('#store-note').textContent = '이 화면에서는 저장소를 쓸 수 없어 프로젝트와 기록이 이 창을 닫으면 사라집니다. claude.ai에서 열면 본인 계정에 저장됩니다(본인만 보임).';
   }
-  storeReady = true; await loadProjects(); loadLegacy();
+  storeReady = true; await loadRates(); await loadProjects(); loadLegacy();
 }
 async function loadProjects() {
   try { P.list = await store.find([['kind', 'project']], 'updatedAt'); }
   catch (e) { P.list = []; $('#proj-list').innerHTML = `<div class="empty">프로젝트를 불러오지 못했습니다${e && e.code ? ` (${esc(e.code)})` : ''}.</div>`; return; }
-  renderProjects(); renderHomeStat(); renderEstimate();
+  renderProjects(); renderHomeStat(); renderEstimate(); renderEstProjects();
 }
+const recProjects = () => P.list.filter(p => p.role !== 'estimate');
 function renderProjects() {
-  const q = $('#proj-q').value.trim().toLowerCase(), xs = P.list.filter(p => !q || [p.name, p.product, p.capacity, p.site, p.year].join(' ').toLowerCase().includes(q));
-  $('#proj-count').textContent = P.list.length ? `${P.list.length}개` : '';
+  const q = $('#proj-q').value.trim().toLowerCase(), xs = recProjects().filter(p => !q || [p.name, p.product, p.capacity, p.site, p.year].join(' ').toLowerCase().includes(q));
+  $('#proj-count').textContent = recProjects().length ? `${recProjects().length}개` : '';
   const X = exampleProject(), showX = X && (!q || [X.name, X.product, X.capacity, '예시'].join(' ').toLowerCase().includes(q));
   const exCard = showX ? `<button type="button" class="proj ex" id="proj-ex"><span class="t">${esc(X.name)} <span class="pill">예시</span></span><span class="m">${esc(projMeta(X) || '')}</span><span class="n"><span>${esc(X.memo || '')}</span></span></button>` : '';
   $('#proj-list').innerHTML = exCard + (xs.length ? xs.map(p => `<button type="button" class="proj" data-p="${esc(p.id)}"><span class="t">${esc(p.name)}</span><span class="m">${esc(projMeta(p) || '제품·능력 미입력')}</span><span class="n"><span>기록 <b>${p.records || 0}</b>건</span><span>설비 <b>${p.equipment || 0}</b></span><span>${new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR')}</span></span></button>`).join('')
-    : `<div class="empty" style="grid-column:1/-1">${P.list.length ? '찾는 프로젝트가 없습니다.' : '아직 프로젝트가 없습니다. "새 프로젝트"로 시작하세요.'}</div>`);
+    : `<div class="empty" style="grid-column:1/-1">${recProjects().length ? '찾는 프로젝트가 없습니다.' : '아직 프로젝트가 없습니다. "새 프로젝트"로 시작하세요.'}</div>`);
   if (showX) $('#proj-ex').onclick = openExample;
   $('#proj-list').querySelectorAll('[data-p]').forEach(b => b.onclick = () => openProject(P.list.find(p => p.id === b.dataset.p)));
 }
 function renderHomeStat() {
-  const r = P.list.reduce((a, p) => a + (p.records || 0), 0);
-  $('#home-stat').textContent = !storeReady ? '' : P.list.length ? `프로젝트 ${P.list.length}개 · 실적 기록 ${r}건` : '아직 쌓인 실적이 없습니다';
+  const L = recProjects(), r = L.reduce((a, p) => a + (p.records || 0), 0), e = P.list.length - L.length;
+  $('#home-stat').textContent = !storeReady ? '' : L.length ? `프로젝트 ${L.length}개 · 실적 기록 ${r}건` : '아직 쌓인 실적이 없습니다';
+  $('#home-est-stat').textContent = !storeReady ? '' : `산출 프로젝트 ${e}개 · 공사 단가 ${RATES.items.length}종`;
 }
 function renderEstimate() {
-  const recs = P.list.reduce((a, p) => a + (p.records || 0), 0), eqs = P.list.reduce((a, p) => a + (p.equipment || 0), 0);
-  $('#est-sum').innerHTML = [['프로젝트', P.list.length + '개'], ['실적 기록', recs + '건'], ['설비 (프로젝트별 최대 기록 합)', eqs + '건']].map(([k, v]) => `<div class="sum"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
-  $('#est-tbl').innerHTML = P.list.length ? `<thead><tr><th>프로젝트</th><th style="text-align:left">제품</th><th style="text-align:left">생산 능력</th><th style="text-align:left">위치</th><th>기준 연도</th><th>기록</th><th>설비</th></tr></thead><tbody>${P.list.map(p => `<tr><td>${esc(p.name)}</td><td class="l">${esc(p.product || '–')}</td><td class="l">${esc(p.capacity || '–')}</td><td class="l">${esc(p.site || '–')}</td><td class="num">${esc(p.year || '–')}</td><td class="num">${p.records || 0}</td><td class="num">${p.equipment || 0}</td></tr>`).join('')}</tbody>` : '';
+  const L = recProjects(), recs = L.reduce((a, p) => a + (p.records || 0), 0), eqs = L.reduce((a, p) => a + (p.equipment || 0), 0);
+  $('#est-sum').innerHTML = [['프로젝트', L.length + '개'], ['실적 기록', recs + '건'], ['설비 (프로젝트별 최대 기록 합)', eqs + '건']].map(([k, v]) => `<div class="sum"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  $('#est-tbl').innerHTML = L.length ? `<thead><tr><th>프로젝트</th><th style="text-align:left">제품</th><th style="text-align:left">생산 능력</th><th style="text-align:left">위치</th><th>기준 연도</th><th>기록</th><th>설비</th></tr></thead><tbody>${L.map(p => `<tr><td>${esc(p.name)}</td><td class="l">${esc(p.product || '–')}</td><td class="l">${esc(p.capacity || '–')}</td><td class="l">${esc(p.site || '–')}</td><td class="num">${esc(p.year || '–')}</td><td class="num">${p.records || 0}</td><td class="num">${p.equipment || 0}</td></tr>`).join('')}</tbody>` : '';
 }
 /* project dialog (new / edit) */
 const PF = {name: 'pf-name', product: 'pf-product', capacity: 'pf-cap', site: 'pf-site', year: 'pf-year', memo: 'pf-memo'};
 let pEditing = null;
-function openProjectDialog(p) {
-  pEditing = p || null; $('#pdlg-t').textContent = p ? '프로젝트 정보 수정' : '새 프로젝트'; $('#pf-ok').textContent = p ? '저장' : '만들기'; $('#pf-msg').textContent = '';
+let pRole = 'record';
+function openProjectDialog(p, role) {
+  pEditing = p || null; pRole = p ? p.role || 'record' : role || 'record'; $('#pdlg-t').textContent = p ? '프로젝트 정보 수정' : pRole === 'estimate' ? '새 산출 프로젝트' : '새 프로젝트'; $('#pf-ok').textContent = p ? '저장' : '만들기'; $('#pf-msg').textContent = '';
   for (const k in PF) $('#' + PF[k]).value = p ? (p[k] || '') : '';
   $('#pdlg').showModal(); $('#pf-name').focus();
 }
 async function submitProject() {
   const name = $('#pf-name').value.trim(); if (!name) { $('#pf-name').focus(); return; }
   const now = Date.now(), id = pEditing ? pEditing.id : 'proj-' + now.toString(36);
-  const data = {...(pEditing || {kind: 'project', createdAt: now, records: 0, equipment: 0}), updatedAt: now};
+  const data = {...(pEditing || {kind: 'project', role: pRole, createdAt: now, records: 0, equipment: 0}), updatedAt: now};
   for (const k in PF) data[k] = $('#' + PF[k]).value.trim();
   try { await store.set(id, data); } catch (e) { $('#pf-msg').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : ''); return; }
   $('#pdlg').close(); const p = {...data, id};
@@ -1839,6 +1883,7 @@ function go(name) {
   $('#home').hidden = name !== 'home'; $('#app').hidden = name === 'home';
   ['records', 'project', 'estimate'].forEach(k => { $('#' + k).hidden = k !== name; });
   $('#nav-rec').hidden = $('#nav-sep2').hidden = name !== 'project';
+  $('#nav-rec').textContent = isEst() ? '투자비 산출' : '실적 입력';
   if (name === 'records') $('#nav-cur').textContent = '실적 입력';
   if (name === 'estimate') $('#nav-cur').textContent = '투자비 산출';
   document.title = name === 'records' ? '실적 입력 · 공정 실적·투자비' : name === 'estimate' ? '투자비 산출 · 공정 실적·투자비' : '공정 실적·투자비';
@@ -1853,25 +1898,26 @@ function leaveWork() {
 }
 function resetWork() {
   Object.assign(S, {files: [], sheets: [], links: null, xlsxTables: [], docText: '', result: null, bundle: null, recordId: null});
-  Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}, cost: null, costCalc: null, costSig: ''}); $('#cost-msg').textContent = ''; $('#cost-save').textContent = '';
+  Object.assign(EQ, {rows: [], refsMissing: [], sheetsDone: 0, sheetsTotal: 0, state: 'idle', q: '', sample: null, areaNames: {}, cost: null, costCalc: null, costSig: '', qty: null, est: null, estSig: ''}); EST_CALC = null; $('#qty').hidden = $('#estc').hidden = true; $('#qty-msg').textContent = $('#ec-msg').textContent = ''; $('#cost-msg').textContent = ''; $('#cost-save').textContent = '';
   $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
   Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
 }
 function renderProjectHead() {
   const p = S.project, X = !p && S.viewProject;
-  $('#p-eyebrow').textContent = p ? '프로젝트' : X ? '예시 프로젝트 · 저장되지 않는 보기' : '둘러보기';
+  $('#p-eyebrow').textContent = p ? (p.role === 'estimate' ? '투자비 산출 프로젝트' : '실적 프로젝트') : X ? '예시 프로젝트 · 저장되지 않는 보기' : '둘러보기';
   $('#p-name').textContent = p ? p.name : X ? X.name : (S.viewLabel || '둘러보기');
   $('#p-adopt').hidden = !X;
   if (X) { $('#p-meta').innerHTML = [['제품', X.product], ['생산 능력', X.capacity], ['위치', X.site], ['기준 연도', X.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (X.memo ? `<span>${esc(X.memo)}</span>` : ''); }
   else $('#p-meta').innerHTML = p ? [['제품', p.product], ['생산 능력', p.capacity], ['위치', p.site], ['기준 연도', p.year]].filter(x => x[1]).map(([k, v]) => `<span>${k} <b>${esc(v)}</b></span>`).join('') + (p.memo ? `<span>${esc(p.memo)}</span>` : '')
     : '<span>프로젝트에 저장되지 않는 보기입니다.</span>';
-  $('#p-btns').hidden = !p; $('#setup-cols').hidden = !p; $('#r-save').hidden = !p; $('#r-new').textContent = p ? '새 데이터 입력' : '실적 입력으로';
+  $('#p-btns').hidden = !p; $('#setup-cols').hidden = !p; $('#r-save').hidden = !p; $('#eq-cost').hidden = isEst();
+  $('#saved').querySelector('h2').firstChild.textContent = isEst() ? '산출 기록 ' : '실적 기록 '; $('#r-new').textContent = p ? '새 데이터 입력' : '실적 입력으로';
   $('#nav-cur').textContent = p ? p.name : X ? X.name : (S.viewLabel || '둘러보기');
 }
 async function openProject(p) {
   if (!p || !leaveWork()) return;
-  S.project = p; resetWork(); renderProjectHead(); go('project'); await loadRecords();
+  S.project = p; if (p.role === 'estimate') REF.clear(); resetWork(); renderProjectHead(); go('project'); await loadRecords();
 }
 async function openView(B, label, example) {   // demo, real-data sample, a JSON file: shown without a project, never saved
   if (!leaveWork()) return false;
@@ -1903,7 +1949,7 @@ async function saveRecord() {
   if (!S.project || !S.bundle) return false;
   const E = EQ.rows.length ? {rows: EQ.rows, refsMissing: EQ.refsMissing, areaNames: EQ.areaNames || {},
     file: EQ.sample ? EQ.sample.file : S.files.filter(e => e.kind === 'pdf' && e.ok).map(e => e.file.name).join(', '), sheets: EQ.sample ? EQ.sample.sheets : S.sheets.length, cost: EQ.cost || null} : null;
-  const payload = JSON.stringify({bundle: S.bundle, equipment: E}), n = Math.ceil(payload.length / PART), now = Date.now();
+  const payload = JSON.stringify({bundle: S.bundle, equipment: E, qty: EQ.qty || null, est: EQ.est || null}), n = Math.ceil(payload.length / PART), now = Date.now();
   const id = S.recordId || 'rec-' + now.toString(36);
   try {
     const old = S.recordId ? await store.get(id) : null;
@@ -1913,7 +1959,7 @@ async function saveRecord() {
     await store.set(id, {kind: 'record', projectId: S.project.id, title: S.bundle.title || tabs[0] || '흐름도', createdAt: old ? old.createdAt : now, updatedAt: now, parts: n, size: payload.length, tabs,
       streams: S.bundle.tabs.reduce((a, t) => a + Object.values(t.flow.streams || {}).filter(s => !s.info).length, 0), equipment: EQ.rows.length, files: recFiles().slice(0, 200)});
     S.recordId = id; await loadRecords(); await syncProject();
-    $('#r-status').textContent = `프로젝트 "${S.project.name}"에 실적 기록을 저장했습니다 (${stamp(now)}).`;
+    $('#r-status').textContent = `프로젝트 "${S.project.name}"에 ${isEst() ? '산출' : '실적'} 기록을 저장했습니다 (${stamp(now)}).`;
     return true;
   } catch (e) { $('#r-status').textContent = '기록을 저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : '') + '. JSON으로 내려받아 두세요.'; return false; }
 }
@@ -1923,7 +1969,7 @@ async function openRecord(id) {
     const r = await store.get(id); if (!r) throw new Error('기록이 없습니다');
     let body = ''; for (let i = 0; i < (r.parts || 0); i++) { const x = await store.get(`part-${id}-${i}`); if (!x) throw new Error('기록 일부가 없습니다'); body += x.data; }
     const X = JSON.parse(body);
-    resetWork(); S.recordId = id;
+    resetWork(); S.recordId = id; EQ.qty = X.qty || null; EQ.est = X.est || null;
     const E = X.equipment;
     if (E && E.rows) { Object.assign(EQ, {rows: E.rows, refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label: '저장된 기록', file: E.file, sheets: E.sheets}, state: 'done', cost: E.cost || null, costSig: ''}); $('#eq').hidden = false; eqProgress(100, `저장된 기록 · 설비 ${E.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done'); }
     await showBundle(X.bundle, true); renderEquipment(); loadRecords();
@@ -1946,7 +1992,7 @@ async function deleteProject() {
     for (const r of recs) { for (let i = 0; i < (r.parts || 0); i++) await store.del(`part-${r.id}-${i}`).catch(() => {}); await store.del(r.id); }
     await store.del(S.project.id);
   } catch (e) { say('프로젝트를 지우지 못했습니다' + (e && e.code ? ` (${e.code})` : ''), 'bad'); return; }
-  S.project = null; resetWork(); go('records'); loadProjects();
+  const back = S.project.role === 'estimate' ? 'estimate' : 'records'; S.project = null; resetWork(); go(back); loadProjects();
 }
 /* flows saved before projects existed (kind 'flow'): open read-only or delete */
 async function loadLegacy() {
@@ -2274,13 +2320,13 @@ function renderEquipment() {
   const mb = EQ.rows.some(r => r.mb);
   const sig = EQ.rows.length + '|' + (EQ.cost ? JSON.stringify([EQ.cost.edits, EQ.cost.pick, EQ.cost.ai, EQ.cost.list && EQ.cost.list.items.length]) : '');
   if (sig !== EQ.costSig) { EQ.costSig = sig; EQ.costCalc = EQ.cost ? computeCosts() : null; renderCostPanel(); }
-  const K = EQ.costCalc, cu = EQ.cost && EQ.cost.unit ? ` (${esc(EQ.cost.unit)})` : '', hasList = !!(EQ.cost && EQ.cost.list);
-  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', `설비비${cu}`, ...(hasList ? ['매칭'] : []), 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
+  const K = EQ.costCalc, cu = EQ.cost && EQ.cost.unit ? ` (${esc(EQ.cost.unit)})` : '', hasList = !!(EQ.cost && EQ.cost.list), showCost = !isEst();
+  const head = ['No.', 'Tag No.', '설비 이름 (도면 원문)', '종류', '운전 구분', ...(showCost ? [`설비비${cu}`] : []), ...(hasList && showCost ? ['매칭'] : []), 'Area', 'PFD 도면 번호', '쪽', '구역', ...(mb ? ['기준 Stream', 'Design (t/h)', 'T (°C)', 'P (bar)'] : []), '확인 필요'];
   const stCls = s => s === '미확인' ? 'st-unk' : s.startsWith('예비') || s.startsWith('향후') ? 'st-sb' : '';
   $('#eq-tbl').innerHTML = `<thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => {
     const i = EQ.rows.indexOf(r);
     return `<tr tabindex="0" data-i="${i}" class="${r.untagged ? 'unk' : ''}" title="두 번 누르면 PFD를 엽니다"><td class="mono r">${i + 1}</td><td class="mono">${esc(r.tag)}</td><td title="${esc(r.name)}">${esc(r.name)}</td><td>${esc(r.kind)}</td>
-      <td class="${stCls(r.status)}">${esc(r.status)}</td>${(() => { const b = K && K.byKey[eqKey(r)]; return `<td class="cost" data-k="${esc(eqKey(r))}" title="눌러서 설비비 입력${b && b.split ? ` · 목록 1행을 ${b.split}기에 나눔` : ''}">${b ? fmtCost(b.cost) : '–'}</td>${hasList ? `<td class="how${b && (b.how === 'name' || b.how === 'ai') ? ' chk' : ''}">${b ? esc(HOW[b.how] || '') : ''}</td>` : ''}`; })()}<td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>
+      <td class="${stCls(r.status)}">${esc(r.status)}</td>${!showCost ? '' : (() => { const b = K && K.byKey[eqKey(r)]; return `<td class="cost" data-k="${esc(eqKey(r))}" title="눌러서 설비비 입력${b && b.split ? ` · 목록 1행을 ${b.split}기에 나눔` : ''}">${b ? fmtCost(b.cost) : '–'}</td>${hasList ? `<td class="how${b && (b.how === 'name' || b.how === 'ai') ? ' chk' : ''}">${b ? esc(HOW[b.how] || '') : ''}</td>` : ''}`; })()}<td class="mono">${esc(r.area)}</td><td class="mono" title="${esc(r.dwg)}">${esc(short(r.dwg) || r.dwg || '–')}</td><td class="mono r">${r.page}</td><td class="mono">${esc(r.zone || '–')}</td>
       ${mb ? `<td class="mono">${esc(r.mb ? r.mb.basis : '')}</td><td class="mono r">${r.mb && r.mb.dx !== '' ? fmt(+r.mb.dx) : ''}</td><td class="mono r">${esc(r.mb ? r.mb.T : '')}</td><td class="mono r">${esc(r.mb ? r.mb.P : '')}</td>` : ''}
       <td class="flag" title="${esc(rowFlags(r))}">${esc(rowFlags(r))}</td></tr>`; }).join('') || `<tr><td colspan="${head.length}" class="muted">${EQ.state === 'run' ? '읽는 중…' : '설비를 찾지 못했습니다.'}</td></tr>`}</tbody>`;
   $('#eq-xlsx').disabled = !EQ.rows.length || EQ.state === 'run';
@@ -2288,6 +2334,15 @@ function renderEquipment() {
   const left = S.sheets.filter(sh => sh.eq && !sh.eqVision && sh.textLayer).length;
   $('#eq-vis').textContent = !EQ.rows.length || left === S.sheets.length ? '그림으로 설비 찾기' : left ? `그림으로 설비 찾기 (남은 ${left}장)` : '그림 대조 완료';
   if (EQ.rows.length && !left) $('#eq-vis').disabled = true;
+  afterEquipment();
+}
+let estT = null;
+function afterEquipment() {   // the quantity card (records) and the estimate card (estimate projects) follow the list
+  if (typeof renderQtyCard !== 'function') return;
+  renderQtyCard();
+  const show = isEst() && EQ.rows.length > 0; $('#estc').hidden = !show;
+  const sig = show ? EQ.rows.length + '|' + EQ.rows.filter(r => r.mb).length + '|' + (S.bundle ? S.bundle.tabs.length : 0) + '|' + bundlePackages(S.bundle).length : '';
+  if (show && sig !== EQ.estSig) { EQ.estSig = sig; clearTimeout(estT); estT = setTimeout(() => estRefresh(false), 200); }
 }
 $('#eq-tbl').addEventListener('dblclick', e => { if (e.target.closest('td.cost')) return; const tr = e.target.closest('tr[data-i]'); if (tr) openPfd(EQ.rows[+tr.dataset.i]); });
 $('#eq-tbl').addEventListener('keydown', e => {
@@ -2574,9 +2629,9 @@ async function readCostFile(file) {
 /* ---- matching ---- */
 const nameTokens = s => new Set(String(s || '').toUpperCase().replace(/\(.*?\)/g, ' ').match(/[A-Z]{3,}|[가-힣]{2,}/g) || []);
 const jacc = (a, b) => { if (!a.size || !b.size) return 0; let n = 0; a.forEach(x => { if (b.has(x)) n++; }); return n / (a.size + b.size - n); };
-function computeCosts() {
-  const C = EQ.cost; if (!C) return null;
-  const rows = EQ.rows, keyOf = rows.map(eqKey), idx = {}, baseIdx = {};
+function computeCosts(C = EQ.cost, rows = EQ.rows) {
+  if (!C) return null;
+  const keyOf = rows.map(eqKey), idx = {}, baseIdx = {};
   keyOf.forEach((k, j) => { if (rows[j].untagged) return; (idx[k] = idx[k] || []).push(k); const b = k.replace(/[A-Z]$/, ''); (baseIdx[b] = baseIdx[b] || []).push(k); });
   const items = (C.list && C.list.items) || [], assign = {}, how = {};
   const tagged = new Set();
@@ -2628,7 +2683,7 @@ function costChanged(msg) {
 }
 function renderCostPanel() {
   const C = EQ.cost, K = EQ.costCalc, box = $('#cost');
-  box.hidden = !EQ.rows.length; if (box.hidden) return;
+  box.hidden = !EQ.rows.length || isEst(); if (box.hidden) return;
   $('#cost-unit').value = C ? C.unit || '' : '';
   $('#cost-src').textContent = C && C.list ? `${C.list.file} · ${C.list.sheet} 시트 · 머리글 ${C.list.headerRow}행 (${Object.entries(C.list.cols).map(([k, v]) => `${{tag: 'Tag', name: '설비명', qty: '수량', unit: '단가', amount: '금액'}[k]}=${v}`).join(', ')})` : '수동 Equipment List(설비비 포함 Excel·CSV)를 올리면 PFD 설비와 매칭합니다. 표의 설비비 칸을 눌러 직접 입력할 수도 있습니다.';
   $('#cost-ai').hidden = !(C && C.list && K && K.unmatched.length) || !window.claude; $('#cost-ai').disabled = busy();
@@ -2712,6 +2767,333 @@ $('#cost-clear').onclick = () => armed($('#cost-clear'), () => { if (!EQ.cost) r
 $('#eq-tbl').addEventListener('click', e => { const td = e.target.closest('td.cost'); if (td) editCost(td); });
 
 /* =====================================================================
+   12. Construction quantities (records) and investment estimate
+   Records: actual construction quantities per equipment (tag), per package or for the whole project ("공통").
+   Estimate: equipment cost from the most similar recorded equipment of the same kind, scaled by capacity ratio
+   ^ exponent (or the recorded unit price × capacity); construction cost = learned quantities × company rates.
+   ===================================================================== */
+const isEst = () => !!(S.project && S.project.role === 'estimate');
+const normName = s => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+const PKG_STOP = new Set(['패키지', 'PACKAGE', 'PKG', '설비', '계통', 'SYSTEM', 'UNIT', '공정', 'PLANT']);
+const pkgTokens = s => new Set([...nameTokens(s)].filter(t => !PKG_STOP.has(t)));
+const pkgSim = (a, b) => normName(a) === normName(b) ? 1 : jacc(pkgTokens(a), pkgTokens(b));
+const median = xs => { const a = xs.filter(Number.isFinite).sort((p, q) => p - q); if (!a.length) return null; const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+const mean = xs => xs.length ? xs.reduce((p, q) => p + q, 0) / xs.length : null;
+/* ---- capacity of an equipment row: vessels by nominal volume, the rest by design (else nominal) flow ---- */
+const VOL_KINDS = new Set(['탱크', '반응조', '시크너·청징조', '빈·호퍼', '폰드', '공기 저장조', '믹서', '스크러버']);
+function capOf(r) {
+  const vol = costNum(r.vol), flow = r.mb ? (costNum(r.mb.dx) || costNum(r.mb.nm)) : null;
+  if (VOL_KINDS.has(r.kind) && vol > 0) return {v: vol, u: 'm³'};
+  if (flow > 0) return {v: flow, u: 't/h'};
+  if (vol > 0) return {v: vol, u: 'm³'};
+  return null;
+}
+const fmtCap = c => c ? `${fmt(c.v)} ${c.u}` : '–';
+/* ---- packages of a flow bundle with their equipment keys (box id is a tag, or tags in the box subtitle) ---- */
+function bundlePackages(B) {
+  const out = [];
+  for (const t of (B && B.tabs) || []) {
+    const F = t.flow || {}, byId = {}; (F.nodes || []).forEach(n => { byId[n.id] = n; });
+    for (const p of F.packages || []) {
+      const keys = [...new Set(p.members.flatMap(m => { const n = byId[m] || {id: m}; return [...streamTags(n.id), ...streamTags(n.sub || '')]; }).map(normTag))];
+      out.push({name: p.name, keys, tab: t.label});
+    }
+  }
+  return out;
+}
+/* ---- where a quantity row belongs: equipment tags, a package, or the whole project ---- */
+function resolveTarget(text, keySet, pkgs) {
+  const s = String(text || '').trim();
+  if (!s || /^(공통|전체|common|general|project|프로젝트|기타)$/i.test(s)) return {scope: 'common'};
+  const tags = expandTags(s);
+  if (tags.length) {
+    const ks = [...new Set(tags.flatMap(t => keySet.has(t) ? [t] : [...keySet].filter(k => k.replace(/[A-Z]$/, '') === t || k === t.replace(/[A-Z]$/, ''))))];
+    return ks.length ? {scope: 'eq', keys: ks} : {scope: 'none', why: 'Equipment List에 없는 Tag (공통으로 셈)'};
+  }
+  const p = pkgs.map(x => [x, pkgSim(s, x.name)]).filter(([, j]) => j >= 0.5).sort((a, b) => b[1] - a[1]).map(x => x[0])[0];
+  return p ? {scope: 'pkg', pkg: p.name} : {scope: 'none', why: '대상을 찾지 못함 (공통으로 셈)'};
+}
+/* ---- reading a quantity list ---- */
+const QCOL = {target: /tag|대상|패키지|package|설비|equip/i, work: /공종|work|trade|discipline|항목|구분/i, qty: /물량|수량|q'?ty|quantity|amount/i, unit: /단위|unit|uom/i};
+function parseTable(wb, rx, need) {   // first sheet row that names the needed columns → rows below it
+  for (const sn of wb.SheetNames) {
+    const A = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: true, defval: ''});
+    for (let h = 0; h < Math.min(40, A.length); h++) {
+      const row = A[h].map(c => String(c).trim()), cols = {};
+      row.forEach((c, j) => { if (!c) return; for (const k in rx) if (cols[k] == null && rx[k].test(c)) { cols[k] = j; break; } });
+      if (!need.every(k => cols[k] != null)) continue;
+      return {sheet: sn, headerRow: h + 1, cols, rows: A.slice(h + 1).map((x, i) => ({x, row: h + 2 + i}))};
+    }
+  }
+  return null;
+}
+async function readQtyFile(file) {
+  try {
+    await loadScript(CDN.xlsx);
+    const T = parseTable(XLSX.read(await file.arrayBuffer(), {type: 'array'}), QCOL, ['work', 'qty']);
+    if (!T) { $('#qty-msg').textContent = `${file.name}: 공종과 물량 머리글이 있는 표를 찾지 못했습니다.`; return; }
+    const items = T.rows.map(({x, row}) => ({target: T.cols.target != null ? String(x[T.cols.target]).trim() : '', work: String(x[T.cols.work]).trim(), qty: costNum(x[T.cols.qty]), unit: T.cols.unit != null ? String(x[T.cols.unit]).trim() : '', row}))
+      .filter(it => it.work && it.qty != null && !/합\s*계|소\s*계|total/i.test(it.work));
+    EQ.qty = {file: file.name, items: [...((EQ.qty && EQ.qty.items) || []).filter(it => it.manual), ...items]};
+    qtyChanged(`공사물량 ${items.length}행을 읽었습니다 (${file.name} · ${T.sheet} 시트 ${T.headerRow}행 머리글).`);
+  } catch (e) { $('#qty-msg').textContent = `${file.name}을 읽지 못했습니다: ${e.message || e}`; }
+}
+function qtyChanged(msg) { renderQtyCard(); if (msg) $('#qty-msg').textContent = msg; scheduleRecordSave('#qty-msg'); }
+function scheduleRecordSave(msgSel) {
+  clearTimeout(costSaveT);
+  if (S.project && S.recordId) costSaveT = setTimeout(() => { if (!busy()) saveRecord(); }, 2500);
+  else if (S.project && msgSel) $(msgSel).textContent += ' 흐름도를 생성하면 기록에 함께 저장됩니다.';
+}
+function renderQtyCard() {
+  const box = $('#qty'); box.hidden = !(S.project && !isEst() && EQ.rows.length); if (box.hidden) return;
+  const items = (EQ.qty && EQ.qty.items) || [], keySet = new Set(EQ.rows.filter(r => !r.untagged).map(eqKey)), pkgs = bundlePackages(S.bundle);
+  const W = {}; items.forEach(it => { const k = it.work + '|' + it.unit; W[k] = (W[k] || 0) + it.qty; });
+  const res = items.map(it => resolveTarget(it.target, keySet, pkgs)), cnt = s => res.filter(r => r.scope === s).length;
+  $('#qty-sum').innerHTML = items.length ? [['공사물량', `${items.length}행`], ['설비 기준', cnt('eq') + '행'], ['패키지 기준', cnt('pkg') + '행'], ['공통', cnt('common') + '행'], ['대상 미확인 (공통으로 셈)', cnt('none') + '행', cnt('none') ? 'warn' : ''],
+    ...Object.entries(W).slice(0, 8).map(([k, v]) => [k.split('|')[0], fmt(v) + ' ' + k.split('|')[1]])].map(([k, v, c]) => `<div class="sum"><div class="k">${esc(k)}</div><div class="v ${c || ''}">${esc(v)}</div></div>`).join('') : '';
+  $('#qty-dl').innerHTML = ['공통', ...pkgs.map(p => p.name), ...EQ.rows.filter(r => !r.untagged).map(r => r.tag)].map(v => `<option value="${esc(v)}">`).join('');
+  $('#work-dl').innerHTML = [...new Set([...RATES.items.map(r => r.work), ...items.map(it => it.work)])].map(v => `<option value="${esc(v)}">`).join('');
+  $('#qty-tbl').innerHTML = `<thead><tr><th>대상 (원문)</th><th>연결</th><th>공종</th><th style="text-align:right">물량</th><th>단위</th><th></th></tr></thead><tbody>${items.map((it, i) => { const r = res[i];
+    const to = r.scope === 'eq' ? `설비 ${r.keys.length > 1 ? r.keys.length + '기 (나눔)' : r.keys[0]}` : r.scope === 'pkg' ? `패키지 · ${r.pkg}` : r.scope === 'common' ? '공통' : `<span class="flag">${esc(r.why)}</span>`;
+    return `<tr><td class="mono">${esc(it.target || '(공통)')}</td><td>${r.scope === 'none' ? to : esc(to)}</td><td>${esc(it.work)}</td><td class="mono r">${fmt(it.qty)}</td><td>${esc(it.unit)}</td><td><button type="button" class="link" data-qdel="${i}">빼기</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">아직 공사물량이 없습니다. 목록을 올리거나 위에서 한 줄씩 추가하세요.</td></tr>'}</tbody>`;
+  $('#qty-tbl').querySelectorAll('[data-qdel]').forEach(b => b.onclick = () => { EQ.qty.items.splice(+b.dataset.qdel, 1); qtyChanged('한 행을 뺐습니다.'); });
+}
+function addQtyRow() {
+  const work = $('#qa-work').value.trim(), qty = costNum($('#qa-qty').value);
+  if (!work || qty == null) { $('#qty-msg').textContent = '공종과 물량(숫자)을 넣으세요.'; return; }
+  EQ.qty = EQ.qty || {file: '', items: []};
+  EQ.qty.items.push({target: $('#qa-target').value.trim(), work, qty, unit: $('#qa-unit').value.trim() || (RATES.items.find(r => normName(r.work) === normName(work)) || {}).unit || '', manual: true});
+  $('#qa-qty').value = ''; qtyChanged(`${work} ${fmt(qty)}을 추가했습니다.`);
+}
+/* ---- company construction rates and estimating basis (one document per viewer) ---- */
+const EXP_DEFAULT = {'펌프': 0.52, '탱크': 0.57, '열교환기': 0.6, '반응조': 0.54, '교반기': 0.5, '필터': 0.6, '팬·블로어': 0.6, '압축기': 0.75, '보일러': 0.7, '건조기': 0.6,
+  '시크너·청징조': 0.6, '이온교환탑': 0.6, '믹서': 0.5, '컨베이어': 0.65, '빈·호퍼': 0.6, '폰드': 0.8, '_기본': 0.6};
+const RATES = {items: [], currency: '', exps: {...EXP_DEFAULT}, qexp: 0.7};
+let ratesT = null;
+async function loadRates() {
+  try { const d = await store.get('settings-rates'); if (d) Object.assign(RATES, {items: d.items || [], currency: d.currency || '', exps: {...EXP_DEFAULT, ...(d.exps || {})}, qexp: d.qexp ?? 0.7}); } catch (e) { /* defaults */ }
+  renderRates();
+}
+function ratesChanged(msg) {
+  renderRates(); if (msg) $('#rate-msg').textContent = msg;
+  clearTimeout(ratesT); ratesT = setTimeout(async () => { try { await store.set('settings-rates', {kind: 'rates', ...RATES, updatedAt: Date.now()}); $('#rate-msg').textContent = '저장했습니다.'; } catch (e) { $('#rate-msg').textContent = '저장하지 못했습니다' + (e && e.code ? ` (${e.code})` : ''); } }, 800);
+  if (isEst() && !$('#estc').hidden) estCompute();
+}
+function renderRates() {
+  $('#rate-cur').value = RATES.currency || '';
+  const inp = (attr, v, w, num) => `<input type="text" ${attr} value="${esc(v ?? '')}" ${num ? 'inputmode="decimal"' : ''} style="width:${w};font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);color:var(--ink)${num ? ';text-align:right' : ''}">`;
+  $('#rate-tbl').innerHTML = `<thead><tr><th style="text-align:left">공종</th><th style="text-align:left">단위</th><th>단가${RATES.currency ? ' (' + esc(RATES.currency) + ')' : ''}</th><th></th></tr></thead><tbody>${RATES.items.map((r, i) =>
+    `<tr><td class="l">${inp(`data-r="${i}" data-f="work" aria-label="공종"`, r.work, '100%')}</td><td class="l">${inp(`data-r="${i}" data-f="unit" aria-label="단위"`, r.unit, '80px')}</td><td>${inp(`data-r="${i}" data-f="rate" aria-label="단가"`, r.rate, '120px', true)}</td><td><button type="button" class="link" data-rdel="${i}">빼기</button></td></tr>`).join('') || '<tr><td colspan="4" class="muted">아직 단가가 없습니다. 목록을 올리거나 "행 추가"로 넣으세요.</td></tr>'}</tbody>`;
+  $('#rate-tbl').querySelectorAll('[data-r]').forEach(el => el.addEventListener('change', () => { const r = RATES.items[+el.dataset.r]; if (el.dataset.f === 'rate') { const x = costNum(el.value); if (x == null) { el.style.borderColor = 'var(--bad)'; return; } r.rate = x; } else r[el.dataset.f] = el.value.trim(); ratesChanged(); }));
+  $('#rate-tbl').querySelectorAll('[data-rdel]').forEach(b => b.onclick = () => { RATES.items.splice(+b.dataset.rdel, 1); ratesChanged(); });
+  const kinds = [...new Set([...Object.keys(RATES.exps).filter(k => k !== '_기본'), ...EQ.rows.map(r => r.kind).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ko'));
+  $('#exp-tbl').innerHTML = `<thead><tr><th style="text-align:left">설비 종류</th><th>용량 지수 n</th></tr></thead><tbody>${[...kinds, '_기본'].map(k => `<tr><td class="l">${k === '_기본' ? '그 밖의 종류 (기본)' : esc(k)}</td><td>${inp(`data-x="${esc(k)}" aria-label="${esc(k)} 지수" placeholder="${RATES.exps._기본 ?? 0.6}"`, RATES.exps[k] ?? '', '80px', true)}</td></tr>`).join('')}</tbody>`;
+  $('#exp-tbl').querySelectorAll('[data-x]').forEach(el => el.addEventListener('change', () => { const x = costNum(el.value); if (el.value.trim() === '') delete RATES.exps[el.dataset.x]; else if (x == null || x <= 0 || x > 1.5) { el.style.borderColor = 'var(--bad)'; return; } else RATES.exps[el.dataset.x] = x; ratesChanged(); }));
+  $('#qexp').value = RATES.qexp;
+}
+async function readRateFile(file) {
+  try {
+    await loadScript(CDN.xlsx);
+    const T = parseTable(XLSX.read(await file.arrayBuffer(), {type: 'array'}), {work: QCOL.work, unit: QCOL.unit, rate: /단가|rate|unit\s*(price|cost)|price/i}, ['work', 'rate']);
+    if (!T) { $('#rate-msg').textContent = `${file.name}: 공종과 단가 머리글이 있는 표를 찾지 못했습니다.`; return; }
+    const items = T.rows.map(({x}) => ({work: String(x[T.cols.work]).trim(), unit: T.cols.unit != null ? String(x[T.cols.unit]).trim() : '', rate: costNum(x[T.cols.rate])})).filter(r => r.work && r.rate != null);
+    const by = Object.fromEntries(RATES.items.map(r => [normName(r.work), r])); items.forEach(r => { by[normName(r.work)] = r; });
+    RATES.items = Object.values(by);
+    const h = String((XLSX.utils.sheet_to_json(XLSX.read(await file.arrayBuffer(), {type: 'array'}).Sheets[T.sheet], {header: 1})[T.headerRow - 1] || [])[T.cols.rate] || '');
+    if (!RATES.currency) RATES.currency = ((h.match(/\(([^)]+)\)/) || [])[1] || '').trim();
+    ratesChanged(`단가 ${items.length}행을 읽었습니다 (${file.name}). 같은 공종은 새 값으로 바꿨습니다.`);
+  } catch (e) { $('#rate-msg').textContent = `${file.name}을 읽지 못했습니다: ${e.message || e}`; }
+}
+/* ---- learning data from recorded projects (latest record of each) ---- */
+const REF = new Map();   // project id → learned data
+async function loadPayload(rec) {
+  let body = ''; for (let i = 0; i < (rec.parts || 0); i++) { const x = await store.get(`part-${rec.id}-${i}`); if (!x) throw new Error('기록 일부가 없습니다'); body += x.data; }
+  return JSON.parse(body);
+}
+function learnFrom(p, X) {
+  const E = X.equipment || {}, rows = E.rows || [], K = E.cost ? computeCosts(E.cost, rows) : null;
+  const eqs = rows.filter(r => !r.untagged).map(r => { const k = eqKey(r), b = K && K.byKey[k]; return {proj: p.id, projName: p.name, key: k, tag: r.tag, name: r.name, kind: r.kind, cap: capOf(r), cost: b ? b.cost : null}; });
+  const byKey = Object.fromEntries(eqs.map(e => [e.key, e])), total = eqs.reduce((a, e) => a + (e.cost || 0), 0);
+  const pk = bundlePackages(X.bundle).map(x => ({...x, cost: x.keys.reduce((a, k) => a + ((byKey[k] || {}).cost || 0), 0)}));
+  const keySet = new Set(eqs.map(e => e.key));
+  const qty = ((X.qty && X.qty.items) || []).map(it => ({...it, ...resolveTarget(it.target, keySet, pk)}));
+  return {p, unit: (E.cost && E.cost.unit) || '', eqs, byKey, total, pk, qty, withCost: eqs.filter(e => e.cost > 0).length};
+}
+async function ensureRefs(ids) {
+  for (const id of ids) {
+    if (REF.has(id)) continue;
+    const p = P.list.find(x => x.id === id); if (!p) continue;
+    const recs = await store.find([['kind', 'record'], ['projectId', id]], 'updatedAt');
+    if (!recs.length) { REF.set(id, null); continue; }
+    REF.set(id, learnFrom(p, await loadPayload(recs[0])));
+  }
+}
+/* ---- estimate ---- */
+function estEquipment(refs) {
+  const est = EQ.est, X = RATES.exps, pool = refs.flatMap(d => d.eqs.filter(e => e.cost > 0));
+  return EQ.rows.map(r => {
+    const key = eqKey(r), cap = est.caps[key] || capOf(r), n = X[r.kind] ?? X._기본 ?? 0.6, t = nameTokens(r.name);
+    const same = pool.filter(e => e.kind === r.kind), sim = e => jacc(t, nameTokens(e.name));
+    const sized = cap ? same.filter(e => e.cap && e.cap.u === cap.u) : [];
+    const ref = sized.length ? sized.slice().sort((a, b) => Math.abs(Math.log(cap.v / a.cap.v)) - Math.abs(Math.log(cap.v / b.cap.v)) || (b.key === key) - (a.key === key) || sim(b) - sim(a))[0] : same.slice().sort((a, b) => (b.key === key) - (a.key === key) || sim(b) - sim(a))[0] || null;
+    const ratio = ref && cap && ref.cap && ref.cap.u === cap.u ? cap.v / ref.cap.v : null;
+    const expo = ref ? ref.cost * (ratio ? Math.pow(ratio, n) : 1) : null;
+    const up = median(sized.map(e => e.cost / e.cap.v)), unitEst = up != null && cap ? up * cap.v : null;
+    const method = est.methods[key] || (r.untagged ? 'skip' : expo != null ? 'expo' : 'none');
+    const val = method === 'skip' ? null : est.over[key] != null ? est.over[key] : method === 'expo' ? expo : method === 'unit' ? unitEst : null;
+    const flags = [];
+    if (!r.untagged && !same.length) flags.push('같은 종류 실적 설비비 없음');
+    if (ref && !ratio) flags.push(cap ? '같은 단위 용량 실적 없음 — 실적 금액 그대로' : '용량 정보 없음 — 실적 금액 그대로');
+    if (ratio && (ratio > 3 || ratio < 1 / 3)) flags.push(`용량 차이 큼 (×${fmt(Math.round(ratio * 100) / 100)})`);
+    if (method === 'unit' && unitEst == null) flags.push('단가 산출 불가 (용량 필요)');
+    return {r, key, cap, n, ref, ratio, expo, up, upN: sized.length, unitEst, method, val, over: est.over[key] != null, flags};
+  });
+}
+function estQuantities(eqRes, refs) {
+  const m = RATES.qexp ?? 0.7, W = {}, eqBy = Object.fromEntries(eqRes.map(e => [e.key, e]));
+  const add = (work, unit, part, q, why) => { const k = normName(work); const w = W[k] = W[k] || {work, unit, eq: 0, pkg: 0, common: 0, lines: []}; w[part] += q; if (!w.unit && unit) w.unit = unit; w.lines.push({part, q, why}); };
+  const scale = (vNew, vRef) => vNew > 0 && vRef > 0 ? Math.pow(vNew / vRef, m) : 1;
+  // equipment-level quantities, learned per equipment kind: recorded quantity / Σ cost^m of that kind's priced
+  // equipment in the record, applied to Σ cost^m of the new equipment of the kind (one value per record, averaged)
+  const newBy = {}; eqRes.filter(e => e.method !== 'skip' && e.val > 0).forEach(e => { (newBy[e.r.kind] = newBy[e.r.kind] || []).push(e); });
+  const acc = {};
+  for (const d of refs) {
+    const qk = {};
+    d.qty.filter(x => x.scope === 'eq').forEach(x => x.keys.forEach(k => { const e = d.byKey[k]; if (!e) return; const kk = e.kind + '|' + normName(x.work); (qk[kk] = qk[kk] || {kind: e.kind, work: x.work, unit: x.unit, q: 0}).q += x.qty / x.keys.length; }));
+    for (const [kk, v] of Object.entries(qk)) {
+      const ns = newBy[v.kind] || [], priced = d.eqs.filter(e => e.kind === v.kind && e.cost > 0), refB = priced.reduce((a, e) => a + Math.pow(e.cost, m), 0);
+      if (!ns.length || !(refB > 0)) continue;
+      const newB = ns.reduce((a, e) => a + Math.pow(e.val, m), 0);
+      (acc[kk] = acc[kk] || {...v, n: ns.length, xs: []}).xs.push({q: v.q * newB / refB, why: `${d.p.name} ${v.kind} ${priced.length}기 ${fmt(Math.round(v.q * 100) / 100)}${v.unit}`});
+    }
+  }
+  Object.values(acc).forEach(a => add(a.work, a.unit, 'eq', mean(a.xs.map(x => x.q)), `${a.kind} ${a.n}기 ← ${a.xs.map(x => x.why).join(', ')}`));
+  // package-level quantities: most similar recorded package name, scaled by package equipment cost
+  const newPk = bundlePackages(S.bundle).map(p => ({...p, cost: p.keys.reduce((a, k) => a + ((eqBy[k] || {}).val || 0), 0)}));
+  const rp = refs.flatMap(d => d.qty.filter(x => x.scope === 'pkg').map(x => ({...x, pk: d.pk.find(p => p.name === x.pkg), d})));
+  const pkgUnused = rp.length && !newPk.length;
+  for (const P2 of newPk) {
+    const by = {}, kinds = new Set(P2.keys.map(k => (eqBy[k] || {r: {}}).r.kind).filter(Boolean));
+    rp.forEach(x => { const j = Math.max(pkgSim(P2.name, x.pkg), x.pk ? 0.8 * jacc(kinds, new Set(x.pk.keys.map(k => (x.d.byKey[k] || {}).kind).filter(Boolean))) : 0); if (j >= 0.5) (by[normName(x.work)] = by[normName(x.work)] || []).push({...x, j}); });
+    for (const xs of Object.values(by)) {
+      const best = Math.max(...xs.map(x => x.j)), top = xs.filter(x => x.j === best);
+      const rr = top.map(x => x.pk && x.pk.cost > 0 && P2.cost > 0 ? P2.cost / x.pk.cost : 1), big = rr.some(r => r > 3 || r < 1 / 3);
+      add(xs[0].work, xs[0].unit, 'pkg', mean(top.map(x => x.qty * scale(P2.cost, x.pk && x.pk.cost))), `${P2.name} ← ${top.map(x => x.pkg + '@' + x.d.p.name).join(', ')} (설비비 비 ×${rr.map(r => fmt(Math.round(r * 100) / 100)).join('/')}${big ? ' · 규모 차이 큼 — 확인' : ''})`);
+    }
+  }
+  // project-wide quantities: average intensity per unit of equipment cost
+  const totalNew = eqRes.reduce((a, e) => a + (e.val || 0), 0), cw = {};
+  refs.forEach(d => { if (!(d.total > 0)) return; const s = {}; d.qty.filter(x => x.scope === 'common' || x.scope === 'none').forEach(x => { const k = normName(x.work); s[k] = s[k] || {work: x.work, unit: x.unit, q: 0}; s[k].q += x.qty; });
+    Object.entries(s).forEach(([k, v]) => { (cw[k] = cw[k] || {work: v.work, unit: v.unit, xs: []}).xs.push({i: v.q / d.total, name: d.p.name}); }); });
+  Object.values(cw).forEach(c => add(c.work, c.unit, 'common', mean(c.xs.map(x => x.i)) * totalNew, `설비비 합계 × 실적 원단위 (${c.xs.map(x => x.name).join(', ')})`));
+  return {W, totalNew, pkgUnused, newPk};
+}
+let EST_CALC = null;
+function estCompute() {
+  if (!isEst() || !EQ.rows.length) return;
+  EQ.est = EQ.est || {refs: null, caps: {}, methods: {}, over: {}, qover: {}};
+  const all = P.list.filter(p => p.role !== 'estimate' && p.records > 0), ids = EQ.est.refs || all.map(p => p.id);
+  const refs = ids.map(id => REF.get(id)).filter(Boolean);
+  const eqRes = estEquipment(refs), Q = estQuantities(eqRes, refs);
+  const works = Object.values(Q.W).map(w => { const rt = RATES.items.find(r => normName(r.work) === normName(w.work)), q = EQ.est.qover[normName(w.work)] ?? (w.eq + w.pkg + w.common);
+    return {...w, q, qOver: EQ.est.qover[normName(w.work)] != null, rate: rt ? rt.rate : null, rateUnit: rt ? rt.unit : '', amount: rt ? q * rt.rate : null, unitMismatch: rt && rt.unit && w.unit && normName(rt.unit) !== normName(w.unit)}; });
+  RATES.items.filter(r => !works.some(w => normName(w.work) === normName(r.work)) && EQ.est.qover[normName(r.work)] != null).forEach(r => { const q = EQ.est.qover[normName(r.work)]; works.push({work: r.work, unit: r.unit, eq: 0, pkg: 0, common: 0, lines: [], q, qOver: true, rate: r.rate, rateUnit: r.unit, amount: q * r.rate}); });
+  const units = [...new Set(refs.map(d => d.unit).filter(Boolean))];
+  EST_CALC = {refs, all, eqRes, Q, works, units, eqTotal: eqRes.reduce((a, e) => a + (e.val || 0), 0), wkTotal: works.reduce((a, w) => a + (w.amount || 0), 0)};
+  renderEstCard();
+}
+async function estRefresh(force) {
+  if (!isEst() || !EQ.rows.length) return;
+  EQ.est = EQ.est || {refs: null, caps: {}, methods: {}, over: {}, qover: {}};
+  if (force) REF.clear();
+  const all = P.list.filter(p => p.role !== 'estimate' && p.records > 0), ids = EQ.est.refs || all.map(p => p.id);
+  $('#ec-st').textContent = '실적을 불러오는 중…';
+  try { await ensureRefs(ids); } catch (e) { $('#ec-st').textContent = '실적을 불러오지 못했습니다: ' + (e.message || e.code || e); return; }
+  estCompute();
+}
+function estChanged() { estCompute(); scheduleRecordSave('#ec-msg'); }
+function renderEstCard() {
+  const C = EST_CALC, box = $('#estc'); box.hidden = !(isEst() && EQ.rows.length); if (box.hidden || !C) return;
+  const cu = C.units.length === 1 ? C.units[0] : C.units.length ? C.units.join('/') : '', ru = RATES.currency || '';
+  $('#ec-st').textContent = C.refs.length ? `실적 ${C.refs.length}개 프로젝트에서 학습 · 설비비 있는 실적 설비 ${C.refs.reduce((a, d) => a + d.withCost, 0)}개 · 공사물량 ${C.refs.reduce((a, d) => a + d.qty.length, 0)}행` : '비교할 실적이 없습니다. 실적 입력에서 설비비·공사물량이 있는 기록을 먼저 쌓으세요.';
+  $('#ec-refs').innerHTML = C.all.length ? '<span class="lab">비교 실적</span>' + C.all.map(p => `<label class="chk"><input type="checkbox" data-ref="${esc(p.id)}" ${!EQ.est.refs || EQ.est.refs.includes(p.id) ? 'checked' : ''}> ${esc(p.name)}${REF.get(p.id) ? ` <span class="muted">(설비비 ${REF.get(p.id).withCost} · 물량 ${REF.get(p.id).qty.length})</span>` : ''}</label>`).join('') : '';
+  $('#ec-refs').querySelectorAll('[data-ref]').forEach(cb => cb.onchange = async () => { const ids = [...$('#ec-refs').querySelectorAll('[data-ref]:checked')].map(x => x.dataset.ref); EQ.est.refs = ids.length === C.all.length ? null : ids; await ensureRefs(ids); estChanged(); });
+  const miss = C.eqRes.filter(e => e.method !== 'skip' && e.val == null).length, noRate = C.works.filter(w => w.rate == null).length;
+  $('#ec-sum').innerHTML = [['설비비', fmtCost(C.eqTotal) + (cu ? ' ' + cu : '')], ['공사비', fmtCost(C.wkTotal) + (ru ? ' ' + ru : '')], ['투자비 (설비비 + 공사비)', fmtCost(C.eqTotal + C.wkTotal) + (cu && cu === ru ? ' ' + cu : ''), ''],
+    ['설비비 없는 설비', `${miss}개`, miss ? 'warn' : ''], ['단가 없는 공종', `${noRate}개`, noRate ? 'warn' : ''], ...(cu && ru && cu !== ru ? [['통화 확인', `설비비 ${cu} · 공사 단가 ${ru}`, 'warn']] : [])]
+    .map(([k, v, c]) => `<div class="sum"><div class="k">${esc(k)}</div><div class="v ${c || ''}">${esc(v)}</div></div>`).join('');
+  const sel = (k, m) => `<select data-m="${esc(k)}" aria-label="적용 방법">${[['expo', '용량지수'], ['unit', '실적 단가'], ['skip', '제외']].map(([v, t]) => `<option value="${v}" ${m === v ? 'selected' : ''}>${t}</option>`).join('')}${m === 'none' ? '<option value="none" selected>실적 없음</option>' : ''}</select>`;
+  $('#ec-eq').innerHTML = `<thead><tr><th>Tag No.</th><th>설비 이름</th><th>종류</th><th>용량 (눌러서 수정)</th><th>유사 실적 설비</th><th>실적 용량</th><th class="r">실적 설비비</th><th>n</th><th class="r">용량지수 산출</th><th class="r">실적 단가 (중앙값)</th><th class="r">단가 산출</th><th>적용</th><th class="r">설비비${cu ? ' (' + esc(cu) + ')' : ''}</th><th>확인</th></tr></thead><tbody>${C.eqRes.map(e => `<tr class="${e.method === 'skip' ? 'skip' : ''}">
+    <td class="mono">${esc(e.r.tag)}</td><td title="${esc(e.r.name)}">${esc(e.r.name)}</td><td>${esc(e.r.kind)}</td>
+    <td class="cost" data-cap="${esc(e.key)}" title="용량 입력 (예: 25 m³, 40 t/h)">${esc(fmtCap(e.cap))}${EQ.est.caps[e.key] ? ' ✎' : ''}</td>
+    <td class="mono" title="${e.ref ? esc(e.ref.name) : ''}">${e.ref ? esc(e.ref.tag + ' · ' + e.ref.projName) : '–'}</td><td class="mono">${e.ref ? esc(fmtCap(e.ref.cap)) : '–'}</td><td class="mono r">${e.ref ? fmtCost(e.ref.cost) : '–'}</td>
+    <td class="mono">${e.n}</td><td class="mono r">${fmtCost(e.expo)}${e.ratio ? `<small class="muted"> ×${fmt(Math.round(e.ratio * 100) / 100)}</small>` : ''}</td><td class="mono r">${e.up != null ? fmtCost(e.up) + ' /' + esc(e.cap ? e.cap.u : '') + `<small class="muted"> (${e.upN})</small>` : '–'}</td><td class="mono r">${fmtCost(e.unitEst)}</td>
+    <td>${sel(e.key, e.method)}</td><td class="cost" data-over="${esc(e.key)}" title="설비비 직접 입력 (비우면 산출값)">${e.method === 'skip' ? '–' : fmtCost(e.val)}${e.over ? ' ✎' : ''}</td><td class="flag" title="${esc(e.flags.join('; '))}">${esc(e.flags.join('; '))}</td></tr>`).join('')}</tbody>`;
+  $('#ec-eq').querySelectorAll('select[data-m]').forEach(s => s.onchange = () => { EQ.est.methods[s.dataset.m] = s.value; delete EQ.est.over[s.dataset.m]; estChanged(); });
+  $('#ec-wk').innerHTML = `<thead><tr><th style="text-align:left">공종</th><th style="text-align:left">단위</th><th>설비 기준</th><th>패키지 기준</th><th>공통</th><th>적용 물량 (눌러서 수정)</th><th>단가${ru ? ' (' + esc(ru) + ')' : ''}</th><th>공사비</th><th style="text-align:left">근거</th></tr></thead><tbody>${C.works.map(w => `<tr><td class="l">${esc(w.work)}</td><td class="l">${esc(w.unit || w.rateUnit)}${w.unitMismatch ? ` <span style="color:var(--warn)">≠ 단가 ${esc(w.rateUnit)}</span>` : ''}</td>
+    <td class="num">${fmt(Math.round(w.eq * 100) / 100)}</td><td class="num">${fmt(Math.round(w.pkg * 100) / 100)}</td><td class="num">${fmt(Math.round(w.common * 100) / 100)}</td>
+    <td class="num qo" data-q="${esc(normName(w.work))}" style="cursor:text" title="물량 직접 입력 (비우면 학습값)">${fmt(Math.round(w.q * 100) / 100)}${w.qOver ? ' ✎' : ''}</td><td class="num">${w.rate != null ? fmtCost(w.rate) : '<span style="color:var(--warn)">단가 없음</span>'}</td><td class="num">${fmtCost(w.amount)}</td>
+    <td class="l"><details><summary class="muted">${w.lines.length}건</summary>${w.lines.slice(0, 40).map(l => `<div class="src">${esc({eq: '설비', pkg: '패키지', common: '공통'}[l.part])} ${fmt(Math.round(l.q * 100) / 100)} · ${esc(l.why)}</div>`).join('')}</details></td></tr>`).join('') || '<tr><td colspan="9" class="muted">학습할 공사물량이 없습니다. 실적 입력의 "공사물량"에 실적 물량을 넣으세요.</td></tr>'}</tbody>`;
+  $('#ec-msg').textContent = C.Q.pkgUnused ? '실적에 패키지 기준 물량이 있지만 이 프로젝트에는 패키지가 없어 적용하지 않았습니다. 흐름도에서 "패키지 묶기"를 하세요.' : '';
+}
+function editEst(td, kind) {
+  if (td.querySelector('input')) return;
+  const k = td.dataset[kind], cur = kind === 'cap' ? (EQ.est.caps[k] ? `${EQ.est.caps[k].v} ${EQ.est.caps[k].u}` : '') : kind === 'over' ? (EQ.est.over[k] ?? '') : (EQ.est.qover[k] ?? '');
+  td.innerHTML = `<input type="text" value="${esc(cur)}" placeholder="${kind === 'cap' ? '예: 25 m³' : '비우면 산출값'}" style="width:110px;font:inherit;font-size:12px;padding:2px 4px">`;
+  const inp = td.querySelector('input'); inp.focus(); inp.select(); let done = false;
+  const commit = () => { if (done) return; done = true; const v = inp.value.trim(), box = kind === 'cap' ? EQ.est.caps : kind === 'over' ? EQ.est.over : EQ.est.qover;
+    if (!v) delete box[k];
+    else if (kind === 'cap') { const m = v.match(/^([\d.,]+)\s*(.*)$/); const x = m && costNum(m[1]); if (!x) { done = false; inp.style.borderColor = 'var(--bad)'; return; } box[k] = {v: x, u: (m[2] || '').replace('m3', 'm³').trim() || 't/h'}; }
+    else { const x = costNum(v); if (x == null) { done = false; inp.style.borderColor = 'var(--bad)'; return; } box[k] = x; }
+    estChanged(); };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { done = true; estCompute(); } });
+  inp.addEventListener('blur', commit);
+}
+async function downloadEstimate() {
+  const C = EST_CALC; if (!C) return;
+  await loadScript(CDN.xlsx);
+  const cu = C.units.join('/'), ru = RATES.currency, wb = XLSX.utils.book_new(), sheet = (name, aoa, w) => { const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = w.map(x => ({wch: x})); XLSX.utils.book_append_sheet(wb, ws, name); };
+  const r2 = x => x == null ? '' : Math.round(x * 100) / 100;
+  sheet('요약', [['항목', '금액', '단위'], ['설비비', r2(C.eqTotal), cu], ['공사비', r2(C.wkTotal), ru], ['투자비 (설비비 + 공사비)', r2(C.eqTotal + C.wkTotal), cu === ru ? cu : `${cu} + ${ru}`], [], ['프로젝트', S.project.name], ['비교 실적', C.refs.map(d => d.p.name).join(', ')], ['만든 때', new Date().toLocaleString('ko-KR')]], [26, 18, 14]);
+  sheet('설비비', [['Tag No.', '설비 이름', '종류', '용량', '용량 단위', '유사 실적 설비', '실적 프로젝트', '실적 용량', '실적 설비비', '용량 지수 n', '용량비', '용량지수 산출', '실적 단가 (중앙값)', '단가 표본 수', '단가 산출', '적용 방법', `설비비 (${cu})`, '직접 입력', '확인'],
+    ...C.eqRes.map(e => [e.r.tag, e.r.name, e.r.kind, e.cap ? r2(e.cap.v) : '', e.cap ? e.cap.u : '', e.ref ? e.ref.tag : '', e.ref ? e.ref.projName : '', e.ref ? fmtCap(e.ref.cap) : '', e.ref ? r2(e.ref.cost) : '', e.n, r2(e.ratio), r2(e.expo), r2(e.up), e.upN, r2(e.unitEst),
+      {expo: '용량지수', unit: '실적 단가', skip: '제외', none: '실적 없음'}[e.method], r2(e.val), e.over ? '예' : '', e.flags.join('; ')])], [14, 36, 12, 10, 8, 14, 18, 14, 14, 8, 8, 14, 14, 8, 14, 10, 14, 8, 40]);
+  sheet('공사비', [['공종', '단위', '설비 기준 물량', '패키지 기준 물량', '공통 물량', '적용 물량', '직접 입력', `단가 (${ru})`, `공사비 (${ru})`], ...C.works.map(w => [w.work, w.unit || w.rateUnit, r2(w.eq), r2(w.pkg), r2(w.common), r2(w.q), w.qOver ? '예' : '', r2(w.rate), r2(w.amount)])], [18, 8, 14, 14, 12, 12, 8, 12, 14]);
+  sheet('공사물량 근거', [['공종', '구분', '물량', '근거'], ...C.works.flatMap(w => w.lines.map(l => [w.work, {eq: '설비', pkg: '패키지', common: '공통'}[l.part], r2(l.q), l.why]))], [18, 8, 12, 90]);
+  sheet('산출 기준', [['항목', '내용'], ['설비비', '같은 종류의 실적 설비 중 용량(같은 단위)이 가장 가까운 설비를 골라 실적 설비비 × (용량비)^n. 용량을 비교할 수 없으면 실적 금액 그대로. "실적 단가"는 같은 종류·같은 단위 실적의 설비비/용량 중앙값 × 용량.'],
+    ['용량', '탱크·반응조·시크너 등은 Nominal 용적(m³), 그 밖은 흐름도 Stream의 Design(없으면 Nominal) 유량(t/h). 화면에서 고친 값은 "✎"로 표시.'],
+    ['공사물량', `설비 기준: 실적에서 설비 종류·공종별 물량 / Σ(그 종류 설비비^${RATES.qexp})를 학습해 이 프로젝트의 같은 종류 Σ(설비비^${RATES.qexp})에 곱한다(실적이 여럿이면 평균). 패키지 기준: 이름(같은 이름 우선, '패키지'·'설비' 같은 일반어 제외)이나 설비 종류 구성이 가장 비슷한 실적 패키지 물량 × (패키지 설비비 비)^${RATES.qexp}. 공통: 실적의 (공통 물량 / 설비비 합계) 평균 × 이 프로젝트 설비비 합계.`],
+    ['공사비', '적용 물량 × 회사 공사 단가 (공종 이름으로 연결).'], ...Object.entries(RATES.exps).map(([k, v]) => [`지수 · ${k === '_기본' ? '기본' : k}`, v]), ['물량 지수', RATES.qexp]], [22, 110]);
+  const buf = XLSX.write(wb, {bookType: 'xlsx', type: 'array', compression: true}), name = `investment-estimate-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const dl = window.claude ? await window.claude.use('downloads') : null;
+  if (dl) { try { await dl.save({filename: name, data: new Uint8Array(buf)}); $('#ec-msg').textContent = '근거표를 내려받았습니다.'; } catch (e) { if (!e || e.code !== 'declined') $('#ec-msg').textContent = '내려받지 못했습니다.'; } return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf])); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+/* the estimate screen's own lists */
+function renderEstProjects() {
+  const xs = P.list.filter(p => p.role === 'estimate');
+  $('#est-count').textContent = xs.length ? `${xs.length}개` : '';
+  $('#est-list').innerHTML = xs.length ? xs.map(p => `<button type="button" class="proj" data-ep="${esc(p.id)}"><span class="t">${esc(p.name)}</span><span class="m">${esc(projMeta(p) || '제품·능력 미입력')}</span><span class="n"><span>기록 <b>${p.records || 0}</b>건</span><span>설비 <b>${p.equipment || 0}</b></span><span>${new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR')}</span></span></button>`).join('')
+    : '<div class="empty" style="grid-column:1/-1">아직 산출 프로젝트가 없습니다. "새 산출"로 시작하세요.</div>';
+  $('#est-list').querySelectorAll('[data-ep]').forEach(b => b.onclick = () => openProject(P.list.find(p => p.id === b.dataset.ep)));
+}
+$('#qty-up').onclick = () => $('#qty-file').click();
+$('#qty-file').onchange = e => { if (e.target.files[0]) readQtyFile(e.target.files[0]); e.target.value = ''; };
+$('#qa-add').onclick = addQtyRow;
+$('#qa-qty').addEventListener('keydown', e => { if (e.key === 'Enter') addQtyRow(); });
+$('#rate-up').onclick = () => $('#rate-file').click();
+$('#rate-file').onchange = e => { if (e.target.files[0]) readRateFile(e.target.files[0]); e.target.value = ''; };
+$('#rate-add').onclick = () => { RATES.items.push({work: '', unit: '', rate: 0}); renderRates(); const ins = $('#rate-tbl').querySelectorAll('input[data-f="work"]'); if (ins.length) ins[ins.length - 1].focus(); };
+$('#rate-cur').addEventListener('change', e => { RATES.currency = e.target.value.trim(); ratesChanged(); });
+$('#qexp').addEventListener('change', e => { const x = costNum(e.target.value); if (x > 0 && x <= 1.5) { RATES.qexp = x; ratesChanged(); } else e.target.style.borderColor = 'var(--bad)'; });
+$('#exp-reset').onclick = () => { RATES.exps = {...EXP_DEFAULT}; ratesChanged('지수를 기본값으로 되돌렸습니다.'); };
+$('#est-new').onclick = () => openProjectDialog(null, 'estimate');
+$('#ec-run').onclick = () => estRefresh(true);
+$('#ec-xlsx').onclick = downloadEstimate;
+$('#ec-eq').addEventListener('click', e => { const td = e.target.closest('td[data-cap], td[data-over]'); if (td) editEst(td, td.dataset.cap != null ? 'cap' : 'over'); });
+$('#ec-wk').addEventListener('click', e => { const td = e.target.closest('td[data-q]'); if (td) editEst(td, 'q'); });
+
+/* =====================================================================
    9. Wiring
    ===================================================================== */
 $('#pick').onclick = () => $('#file').click();
@@ -2779,7 +3161,7 @@ $('#go-rec').onclick = () => go('records');
 $('#go-est').onclick = () => { renderEstimate(); go('estimate'); };
 $('#est-rec').onclick = () => go('records');
 $('#nav-home').onclick = () => { if (leaveWork()) { go('home'); renderHomeStat(); } };
-$('#nav-rec').onclick = () => { if (leaveWork()) { go('records'); loadProjects(); } };
+$('#nav-rec').onclick = () => { if (leaveWork()) { go(isEst() ? 'estimate' : 'records'); loadProjects(); } };
 $('#proj-new').onclick = () => openProjectDialog(null);
 $('#proj-q').addEventListener('input', renderProjects);
 $('#p-edit').onclick = () => openProjectDialog(S.project);
