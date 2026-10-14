@@ -145,6 +145,15 @@ and shows it at the top of each card in the detail frame:
          "streams": {"422": "탄산화 반응조에서 시크너로 가는 습윤 Li₂CO₃ 슬러리…"}, "at": 1760000000000}
 ```
 
+Optional `packages` on a flow groups equipment boxes (node ids) into purchase / unit-operation packages, the unit
+for investment cost. The HTML app has Claude write it after generation (or from "패키지 묶기") and draws a package
+view from it on the fly: one box per package, only the streams between packages as lines.
+
+```jsonc
+"packages": [{"id": "P1", "name": "Lime 반응 패키지", "what": "염수에 소석회를 넣어 Mg를 침전시킨다",
+              "members": ["3200-RX-005", "3200-TK-001", "3200-TK-093"]}]
+```
+
 ## Projects and records (HTML app)
 
 The app keeps its records in the viewer's private store (`data/users/<id>`), one document per item:
