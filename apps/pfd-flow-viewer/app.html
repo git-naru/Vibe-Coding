@@ -231,6 +231,10 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .eqt tbody tr.flash td{animation:rowflash 1.6s ease-out}
 @keyframes rowflash{0%,40%{background:color-mix(in srgb,#e0301e 28%,transparent)}}
 .eqt td.lay{color:var(--accent);font-family:var(--f-mono);font-size:12px}
+.lay3d{position:relative;height:min(62vh,560px);border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:#e9ece8}
+.lay3d canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.lay3d canvas:active{cursor:grabbing}
+.laytip{position:absolute;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:3px 7px;font-size:12px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 /* ---- start screen: two halves ---- */
 .home{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 .home-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--paper)}
@@ -434,11 +438,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <div class="eqstage"><h2>Layout · GA</h2><span class="muted" id="lay-st"></span></div>
         <div class="eqtools">
           <select id="lay-sheet" aria-label="Layout 도면 고르기"></select>
-          <div class="seg" role="group" aria-label="확대"><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
+          <div class="seg" role="group" aria-label="보기 방식" id="lay-view"><button type="button" data-v="2d" aria-pressed="true">2D 도면</button><button type="button" data-v="3d" aria-pressed="false">3D</button></div>
+          <div class="seg" role="group" aria-label="확대" id="lay-zoom"><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
         </div>
       </div>
       <div class="laywrap" id="lay-wrap"><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
+      <div class="lay3d" id="lay-3d" hidden><canvas id="lay-cv" role="img" aria-label="Layout 3D 보기: 끌어서 돌리기, 휠로 확대, 오른쪽 버튼으로 이동"></canvas><div class="laytip" id="lay-tip" hidden></div><div class="muted laywait" id="lay-3d-wait" hidden></div></div>
       <div class="layinfo" id="lay-info" aria-live="polite"></div>
+      <p class="muted" id="lay-3d-note" hidden style="margin:0"></p>
       <p class="muted" style="margin:0">Layout·GA 도면 글자에서 찾은 설비 Tag를 PFD·P&amp;ID로 만든 Equipment List와 맞춰 표시합니다. 파란 상자는 목록에 있는 설비, 회색 점선은 목록에 없는 Tag입니다. 상자를 누르면 선택되고, 두 번 누르면 Equipment List의 그 설비로 이동합니다. 목록에서 행을 누르면 Layout에서 그 설비가 선택됩니다.</p>
     </section>
 
@@ -611,7 +618,9 @@ const CDN = {
   pdfWorker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
   xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   mammoth: 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
-  dagre: 'https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js'
+  dagre: 'https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js',
+  three: 'https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js',   // r147: the last release with the global-script controls
+  orbit: 'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js'
 };
 const loaded = {};
 function loadScript(url) {
@@ -1991,7 +2000,7 @@ function resetWork() {
   $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
   Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
-  Object.assign(LAY, {sel: null, sheet: 0, z: 1, idx: null, shown: '', marks: ''}); LAY.img.clear(); $('#lay').hidden = true; $('#lay-img').dataset.k = ''; $('#lay-info').innerHTML = '';
+  Object.assign(LAY, {sel: null, sheet: 0, z: 1, idx: null, shown: '', marks: ''}); LAY.img.clear(); L3.sig = ''; $('#lay').hidden = true; $('#lay-img').dataset.k = ''; $('#lay-info').innerHTML = '';
 }
 function renderProjectHead() {
   const p = S.project, X = !p && S.viewProject;
@@ -2590,7 +2599,7 @@ async function pageImage(sh, maxW, maxScale = 4) {   // one PDF page as a JPEG d
 const LAY_TITLE = /GENERAL\s+ARRANGEMENT|PLOT\s+PLAN|LAY-?OUT|EQUIPMENT\s+ARRANGEMENT|ARRANGEMENT\s+(?:PLAN|DRAWING)|배치도/i;
 const LAY_FILE = /lay-?out|plot.?plan|general.?arr|(?:^|[^a-z])ga(?:[^a-z]|$)|배치/i;
 const LAY_NOT = /PROCESS\s+FLOW\s+DIAGRAM|PIPING\s+(?:AND|&)\s+INSTRUMENT|\bP\s*&\s*ID\b|MASS\s+BALANCE|STREAM\s+TABLE/i;
-const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve()};
+const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve(), view: '2d'};
 function isLayoutSheet(sh, fileName) {
   if (sh.dwg || sh.title) return false;
   const block = sh.items.filter(it => it.y0 > 0.7 && it.x0 > 0.5).map(it => it.s).join(' ');
@@ -2635,7 +2644,7 @@ function renderLayout(force) {
   $('#lay-sheet').disabled = X.sheets.length < 2;
   for (const k of LAY.img.keys()) if (!S.layouts.some(sh => sh.key === k)) LAY.img.delete(k);
   if (LAY.sel) layInfo(LAY.sel);
-  return drawLayout();
+  return LAY.view === '3d' ? draw3d() : drawLayout();
 }
 async function drawLayout() {   // the sheet's picture (rendered once per sheet), then its marks; the selection is repainted every time
   const L = LAY.idx && LAY.idx.sheets[LAY.sheet]; if (!L) return;
@@ -2677,7 +2686,8 @@ async function layoutSelect(key, fromList) {
   const w = X.where.get(key) || [];
   $('#eq-tbl').querySelectorAll('tr[data-i]').forEach(tr => tr.classList.toggle('lsel', (X.rowsOf.get(key) || []).includes(+tr.dataset.i)));
   layInfo(key);
-  if (w.length && !w.includes(LAY.sheet)) { LAY.sheet = w[0]; await renderLayout(true); } else await drawLayout();
+  if (w.length && !w.includes(LAY.sheet)) { LAY.sheet = w[0]; await renderLayout(true); } else await (LAY.view === '3d' ? draw3d() : drawLayout());
+  if (LAY.view === '3d') { if (fromList) focus3d(key); return; }
   const el = $('#lay-marks').querySelector(`.lmk[data-k="${CSS.escape(key)}"]`); if (!el || !fromList) return;
   const b = X.sheets[LAY.sheet].marks.find(m => m.key === key).box;
   layZoom(Math.max(LAY.z, 2.5), [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
@@ -2711,6 +2721,138 @@ $('#lay-marks').addEventListener('click', e => { const b = e.target.closest('.lm
 $('#lay-marks').addEventListener('dblclick', e => { const b = e.target.closest('.lmk'); if (b) gotoRow(b.dataset.k); });
 $('#lay-sheet').addEventListener('change', e => { LAY.sheet = +e.target.value; renderLayout(true); });
 $('#lay').querySelectorAll('[data-z]').forEach(b => b.onclick = () => layZoom(b.dataset.z));
+
+/* ---- 3D: the Layout drawing as the floor, each tag's equipment as a simple solid where its tag is written ----
+   An approximation from a 2D plan: shapes by equipment kind, vessels sized from their nominal volume, other sizes
+   and all heights typical; metres from the drawing's "SCALE 1:N" and paper size, else the sheet is taken as 150 m
+   wide. Picking works both ways with the list, as in 2D. */
+const L3 = {sig: '', r: null, scene: null, cam: null, ctl: null, objs: new Map(), span: 150, down: null, tipT: 0};
+const LAY_W = 150;   // metres across a sheet whose scale is not written on it
+async function layMetres(sh) {
+  const page = await pageOf(sh), vp = page.getViewport({scale: 1});
+  const it = sh.items.find(x => /SCALE\s*[:=]?\s*1\s*[:/]\s*\d{2,5}\b/i.test(x.s)), n = it ? +it.s.match(/1\s*[:/]\s*(\d{2,5})/)[1] : 0;
+  return {w: n ? vp.width / 72 * 25.4 * n / 1000 : LAY_W, aspect: vp.height / vp.width, scale: n};
+}
+function solidOf(r) {   // metres: w/d across, h up; d alone is a diameter
+  if (!r) return {shape: 'box', w: 1, d: 1, h: 1};
+  const k = r.kind, vol = costNum(r.vol);
+  if (k === '폰드') { const a = vol > 0 ? Math.sqrt(vol / 3) : 10; return {shape: 'box', w: a, d: a, h: 3}; }
+  if (VOL_KINDS.has(k) || ['보일러', '이온교환탑', '드럼', '용기', '분리기'].includes(k)) {
+    const D = vol > 0 ? Math.cbrt(vol / (0.375 * Math.PI)) : 3;   // a vertical vessel 1.5 diameters tall
+    return {shape: k === '빈·호퍼' ? 'hopper' : 'cyl', d: D, h: 1.5 * D};
+  }
+  if (k === '펌프') return {shape: 'pump', h: 0.9};
+  if (k === '열교환기' || k === '냉각기' || k === '칠러') return {shape: 'hcyl', d: 0.8, l: 4};
+  if (k === '컨베이어' || k === '스크루 피더·컨베이어') return {shape: 'box', w: 8, d: 1, h: 0.8};
+  if (k === '팬·블로어' || k === '압축기') return {shape: 'box', w: 2, d: 1.5, h: 1.5};
+  if (k === '필터') return {shape: 'cyl', d: 1.2, h: 2};
+  if (k === '교반기') return {shape: 'agit', h: 2.2};
+  return {shape: 'box', w: 1.5, d: 1.5, h: 1.5};
+}
+function solidMesh(T, s, mat) {
+  const g = new T.Group(), add = (geo, y, x = 0, rz = 0) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, 0); m.rotation.z = rz; g.add(m); return m; };
+  if (s.shape === 'cyl') add(new T.CylinderGeometry(s.d / 2, s.d / 2, s.h, 32), s.h / 2);
+  else if (s.shape === 'hopper') { add(new T.CylinderGeometry(s.d / 2, s.d / 2, s.h * 0.6, 32), s.h * 0.7); add(new T.ConeGeometry(s.d / 2, s.h * 0.4, 32), s.h * 0.2).rotation.x = Math.PI; }
+  else if (s.shape === 'hcyl') add(new T.CylinderGeometry(s.d / 2, s.d / 2, s.l, 24), s.d / 2 + 0.3, 0, Math.PI / 2);
+  else if (s.shape === 'pump') { add(new T.BoxGeometry(1.5, 0.3, 0.6), 0.15); add(new T.CylinderGeometry(0.3, 0.3, 0.6, 20), 0.6, -0.35, Math.PI / 2); add(new T.CylinderGeometry(0.25, 0.25, 0.7, 20), 0.6, 0.35, Math.PI / 2); }
+  else if (s.shape === 'agit') { add(new T.CylinderGeometry(0.08, 0.08, 1.6, 12), 0.8); add(new T.BoxGeometry(0.6, 0.6, 0.6), 1.9); }
+  else add(new T.BoxGeometry(s.w, s.h, s.d), s.h / 2);
+  return g;
+}
+const solidColor = r => !r ? 0x8a94a0 : r.status.startsWith('예비') ? 0xa3adb8 : r.status.startsWith('향후') ? 0xd79a52 : 0x3f7fd0;
+async function draw3d() {
+  const L = LAY.idx && LAY.idx.sheets[LAY.sheet]; if (!L) return;
+  const wait = $('#lay-3d-wait'), sig = L.sh.key + '#' + LAY.idx.sig;
+  if (L3.sig !== sig) {
+    wait.textContent = '3D로 세우는 중…'; wait.hidden = false;
+    try { await loadScript(CDN.three); await loadScript(CDN.orbit); } catch (e) { wait.textContent = e.message || String(e); return; }
+    let url = LAY.img.get(L.sh.key);
+    if (!url) { try { url = await pageImage(L.sh, 2400, 3); LAY.img.set(L.sh.key, url); } catch (e) { wait.textContent = 'Layout 도면을 그리지 못했습니다: ' + (e.message || e); return; } }
+    const M = await layMetres(L.sh);
+    if (!LAY.idx || LAY.idx.sheets[LAY.sheet] !== L || LAY.view !== '3d') return;   // another sheet or the 2D view was picked meanwhile
+    try { build3d(L, url, M); } catch (e) { wait.textContent = '이 브라우저에서는 3D를 그릴 수 없습니다 (' + (e.message || e) + ').'; return; }
+    L3.sig = sig; wait.hidden = true;
+  }
+  paint3d();
+}
+function build3d(L, url, M) {
+  const T = THREE, cv = $('#lay-cv');
+  if (!L3.r) {
+    L3.r = new T.WebGLRenderer({canvas: cv, antialias: true}); L3.r.setPixelRatio(Math.min(2, devicePixelRatio || 1)); L3.r.outputEncoding = T.sRGBEncoding;
+    L3.cam = new T.PerspectiveCamera(40, 1, 0.1, 10000);
+    L3.ctl = new T.OrbitControls(L3.cam, cv); L3.ctl.maxPolarAngle = Math.PI / 2 - 0.05; L3.ctl.addEventListener('change', render3d);
+    new ResizeObserver(size3d).observe($('#lay-3d'));
+    cv.addEventListener('pointerdown', e => { L3.down = [e.clientX, e.clientY]; });
+    cv.addEventListener('pointerup', e => { const d = L3.down; L3.down = null; if (!d || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 5) return; const k = pick3d(e); if (k) layoutSelect(k, false); });
+    cv.addEventListener('dblclick', e => { const k = pick3d(e); if (k) gotoRow(k); });
+    cv.addEventListener('pointermove', e => { if (L3.down || L3.tipT) return; L3.tipT = requestAnimationFrame(() => { L3.tipT = 0; tip3d(e); }); });
+    cv.addEventListener('pointerleave', () => { $('#lay-tip').hidden = true; });
+  }
+  if (L3.scene) L3.scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+  const S3 = L3.scene = new T.Scene(); S3.background = new T.Color(getComputedStyle(document.body).backgroundColor || '#e9ece8');
+  S3.add(new T.HemisphereLight(0xffffff, 0x8a8f88, 0.95)); const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-1, 2, 1.2); S3.add(sun);
+  const W = M.w, H = M.w * M.aspect; L3.span = Math.max(W, H);
+  const tex = new T.TextureLoader().load(url, render3d); tex.encoding = T.sRGBEncoding; tex.anisotropy = L3.r.capabilities.getMaxAnisotropy();
+  const floor = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshBasicMaterial({map: tex})); floor.rotation.x = -Math.PI / 2; S3.add(floor);
+  // equipment: vessels first, so an agitator written next to its tank sits on the tank's top
+  L3.objs = new Map(); const placed = [], at = b => [((b[0] + b[2]) / 2 - 0.5) * W, ((b[1] + b[3]) / 2 - 0.5) * H];
+  const marks = L.marks.map(m => ({m, r: m.rows.length ? EQ.rows[m.rows[0]] : null})).map(o => ({...o, s: solidOf(o.r)}));
+  // several tags in one piece of text ('2000-IX-002~004') stand side by side along it
+  const same = new Map(); marks.forEach(o => { const k = o.m.box.join(','); same.has(k) ? same.get(k).push(o) : same.set(k, [o]); });
+  const gap = o => o.s.d || o.s.w || 1.5;
+  for (const [, os] of same) { const step = Math.max(...os.map(gap)) * 1.3; os.forEach((o, i) => { o.dx = (i - (os.length - 1) / 2) * step; }); }
+  for (const {m, r, s, dx} of [...marks.filter(o => o.s.shape !== 'agit'), ...marks.filter(o => o.s.shape === 'agit')]) {
+    let [x, z] = at(m.box), y = 0; x += dx;
+    if (placed.some(p => p.key === m.key && Math.hypot(p.x - x, p.z - z) < 2)) continue;   // the same tag written twice in one place
+    if (s.shape === 'agit') { const v = placed.filter(p => p.top && Math.hypot(p.x - x, p.z - z) < 6).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0]; if (v) [x, z, y] = [v.x, v.z, v.top]; }
+    const fut = r && r.status.startsWith('향후'), mat = new T.MeshStandardMaterial({color: solidColor(r), roughness: 0.6, metalness: 0.1, transparent: !r || fut, opacity: !r ? 0.4 : fut ? 0.55 : 1});
+    const g = solidMesh(T, s, mat); g.position.set(x, y, z); g.userData = {key: m.key, mat, color: solidColor(r)}; S3.add(g);
+    placed.push({key: m.key, x, z, top: s.shape === 'cyl' || s.shape === 'hopper' ? s.h : 0});
+    L3.objs.has(m.key) ? L3.objs.get(m.key).push(g) : L3.objs.set(m.key, [g]);
+  }
+  // first view: the area the equipment stands in (the whole sheet when none was found), seen from the south at 45°
+  const xs = placed.map(p => p.x), zs = placed.map(p => p.z), cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0, cz = zs.length ? (Math.min(...zs) + Math.max(...zs)) / 2 : 0;
+  const ext = xs.length ? Math.max(20, Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) * 1.2 : L3.span;
+  L3.ctl.target.set(cx, 0, cz); L3.cam.near = L3.span / 2000; L3.cam.far = L3.span * 10; L3.cam.position.set(cx, ext * 0.8, cz + ext * 0.8); L3.cam.updateProjectionMatrix(); L3.ctl.update();
+  $('#lay-3d-note').textContent = (M.scale ? `도면 축척 1:${M.scale}로 크기를 맞췄습니다 (도면 폭 ${fmt(Math.round(W))} m).` : `도면에 축척이 없어 도면 폭을 ${LAY_W} m로 놓았습니다.`)
+    + ' 2D 도면에서 만든 근사 3D입니다: 위치는 Tag가 적힌 자리, 모양·높이는 설비 종류별 기본값이고 탱크·반응조 등은 Nominal 용적으로 크기를 잡았습니다. 파랑 운전, 회색 예비, 주황 향후, 반투명 회색은 Equipment List에 없는 Tag입니다. 끌어서 돌리고, 휠로 확대하고, 오른쪽 버튼(또는 Shift+끌기)으로 옮깁니다.';
+  size3d();
+}
+function render3d() { if (L3.r && L3.scene) L3.r.render(L3.scene, L3.cam); }
+function size3d() {
+  const el = $('#lay-3d'), w = el.clientWidth, h = el.clientHeight; if (!L3.r || !w || !h) return;
+  L3.r.setSize(w, h, false); L3.cam.aspect = w / h; L3.cam.updateProjectionMatrix(); render3d();
+}
+function paint3d() {   // the selected equipment turns red
+  for (const [k, gs] of L3.objs) gs.forEach(g => { const on = k === LAY.sel, m = g.userData.mat; m.color.setHex(on ? 0xe0301e : g.userData.color); m.emissive.setHex(on ? 0x5a0d06 : 0x000000); });
+  render3d();
+}
+function pick3d(e) {
+  if (!L3.scene) return null;
+  const T = THREE, r = $('#lay-cv').getBoundingClientRect(), ray = new T.Raycaster();
+  ray.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), L3.cam);
+  for (const h of ray.intersectObjects([...L3.objs.values()].flat(), true)) { let o = h.object; while (o && !o.userData.key) o = o.parent; if (o) return o.userData.key; }
+  return null;
+}
+function tip3d(e) {
+  const k = pick3d(e), tip = $('#lay-tip'); if (!k) { tip.hidden = true; return; }
+  const rows = (LAY.idx.rowsOf.get(k) || []), row = rows.length ? EQ.rows[rows[0]] : null, box = $('#lay-3d').getBoundingClientRect();
+  tip.textContent = k + (row ? ' · ' + (row.name || row.kind || '') : ' · Equipment List에 없음');
+  tip.style.left = Math.min(e.clientX - box.left + 12, box.width - 200) + 'px'; tip.style.top = (e.clientY - box.top + 12) + 'px'; tip.hidden = false;
+}
+function focus3d(key) {   // from the list: the camera moves over the equipment
+  const g = (L3.objs.get(key) || [])[0]; if (!g || !L3.ctl) return;
+  const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()), off = L3.cam.position.clone().sub(L3.ctl.target).setLength(Math.max(25, size.length() * 5));
+  L3.ctl.target.copy(g.position); L3.cam.position.copy(g.position).add(off); L3.ctl.update();
+  const r = $('#lay-3d').getBoundingClientRect(); if (r.bottom < 60 || r.top > innerHeight - 60) $('#lay-3d').scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+function setLayView(v) {
+  LAY.view = v;
+  $('#lay-view').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  $('#lay-wrap').hidden = $('#lay-zoom').hidden = v === '3d'; $('#lay-3d').hidden = $('#lay-3d-note').hidden = v !== '3d';
+  renderLayout(true);
+}
+$('#lay-view').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { if (LAY.view !== b.dataset.v) setLayView(b.dataset.v); });
 
 /* ---- Excel ---- */
 async function downloadEquipment() {

@@ -54,7 +54,7 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 
 ## 4. HTML 앱 구조 (`app.html`)
 
-한 파일 안에 CSS, 마크업(화면 4개 + 대화상자), 스크립트가 있다. 외부 라이브러리는 jsdelivr CDN에서 필요할 때 불러온다: pdf.js 3.11.174, SheetJS 0.18.5, mammoth 1.8.0, dagre 0.8.5. pdf.js의 한글 CMap은 CDN에서 받지 않고 빌드 때 `#cmap-data`로 넣은 것을 `CMapReader`가 내준다(`openPdfDoc`).
+한 파일 안에 CSS, 마크업(화면 4개 + 대화상자), 스크립트가 있다. 외부 라이브러리는 jsdelivr CDN에서 필요할 때 불러온다: pdf.js 3.11.174, SheetJS 0.18.5, mammoth 1.8.0, dagre 0.8.5, three.js 0.147.0(Layout 3D 보기, 전역 스크립트로 OrbitControls를 쓸 수 있는 마지막 판. 같은 판에 GLTFLoader도 있음). pdf.js의 한글 CMap은 CDN에서 받지 않고 빌드 때 `#cmap-data`로 넣은 것을 `CMapReader`가 내준다(`openPdfDoc`).
 
 화면: 시작(좌 "실적 입력" / 우 "투자비 산출" 2분할) → 실적 입력(프로젝트 목록) → 프로젝트 화면(공정 데이터 입력, 기록, Equipment List, 설비비 매칭, 공사물량, 흐름도, 상세설명 프레임) / 투자비 산출(산출 프로젝트, 공사 단가, 산출 기준). 산출 프로젝트도 같은 프로젝트 화면을 쓰고 "투자비 산출" 카드가 붙는다.
 
@@ -142,6 +142,7 @@ pfdcore 대조 테스트(`core/tests`)는 저장소 안에 있다. 가상 입력
 - Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
 - PDF 글꼴: 한글 CMap은 화면에 들어 있어(`cmaps/`, `CMapReader`) ToUnicode 없는 한글 CID 글꼴·KS 인코딩도 읽는다. 일본어·중국어(Adobe-Japan1/GB1/CNS1) CID 글꼴은 CMap이 없어 글자가 빠진다(다른 CMap은 불러오지 않음). 남은 앱 문제 두 가지(설비비 Tag 칸의 쉼표 뒤 다른 Area Tag, JSON 내려받기에 Equipment List·설비비가 빠짐)는 `core/README.md` 끝.
+- Layout 3D는 2D 도면에서 만든 근사다: 위치는 Tag 글자 자리, 모양·높이는 설비 종류별 기본값, 크기는 탱크류만 용적으로 잡는다. 실제 3D 모델(IFC·glTF) 보기는 아직 없다.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
 
 ## 10. 다음 단계
