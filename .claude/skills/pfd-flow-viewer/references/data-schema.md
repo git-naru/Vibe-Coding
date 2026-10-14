@@ -145,12 +145,16 @@ and shows it at the top of each card in the detail frame:
          "streams": {"422": "탄산화 반응조에서 시크너로 가는 습윤 Li₂CO₃ 슬러리…"}, "at": 1760000000000}
 ```
 
-Optional `packages` on a flow groups equipment boxes (node ids) into purchase / unit-operation packages, the unit
-for investment cost. The HTML app has Claude write it after generation (or from "패키지 묶기") and draws a package
-view from it on the fly: one box per package, only the streams between packages as lines.
+Optional `packages` on a flow groups equipment boxes (node ids) into packages, the unit for investment cost. The HTML
+app makes one package per process area (the 4-digit area of the tags, else of the sheet's drawing number) after
+generation (or from "Area별로 묶기"), without Claude: the area's equipment plus its sheets' distribution headers;
+battery limits and off-page ends stay outside. `name` is the area code plus the area name the drawings give (title
+block "3200 - LIME REACTION", else the flow's row title, else the sheet title), or "3200 Area". The package view is
+drawn from it on the fly: one box per package in one line, only the streams between packages as lines. Records saved
+before this have Claude-made packages without `area`; they are kept until repacked.
 
 ```jsonc
-"packages": [{"id": "P1", "name": "Lime 반응 패키지", "what": "염수에 소석회를 넣어 Mg를 침전시킨다",
+"packages": [{"id": "P1", "name": "3200 LIME REACTION", "what": "Area 3200 · 설비 3개", "area": "3200",
               "members": ["3200-RX-005", "3200-TK-001", "3200-TK-093"]}]
 ```
 
