@@ -217,6 +217,13 @@ h3{font-size:12px;margin:0 0 6px;color:var(--muted);font-family:var(--f-mono);le
 .laystage{position:relative;width:100%}
 .laystage img{display:block;width:100%;background:#fff}
 #lay-marks{position:absolute;inset:0}
+.lay3d{position:relative;height:min(62vh,560px);border:1px solid var(--rule);border-radius:6px;background:#e9ece8;overflow:hidden;touch-action:none}
+.lay3d canvas{display:block;width:100%;height:100%;cursor:grab}
+.lay3d canvas.drag{cursor:grabbing}
+.l3tag{position:absolute;transform:translate(-50%,-120%);background:#e0301e;color:#fff;font:600 12px var(--f-mono);padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;z-index:2}
+.l3legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted)}
+.l3legend:empty{display:none}
+.l3legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 .laywait{position:absolute;inset:0;display:grid;place-items:center}
 .lmk{all:unset;box-sizing:border-box;position:absolute;min-width:14px;min-height:10px;border:1.5px solid #1d5fae;background:rgba(29,95,174,.12);border-radius:3px;cursor:pointer}
 .lmk.off{border:1.5px dashed #6b7480;background:transparent}
@@ -322,7 +329,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .viewbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px;background:var(--panel);border:1px solid var(--rule);border-radius:6px}
 .viewbar .lab{font-size:12.5px;color:var(--muted);font-weight:600}
 .viewbar .seg button{padding:5px 16px;font-size:13px}
-.viewbar #pkg-make{margin-left:auto}
 .seg button:disabled{opacity:.45;cursor:not-allowed}
 .node.pkg rect{stroke-width:2.4;fill:color-mix(in srgb,var(--accent) 8%,var(--panel))}
 .node.pkg .s{fill:var(--accent)}
@@ -434,12 +440,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <div class="eqstage"><h2>Layout · GA</h2><span class="muted" id="lay-st"></span></div>
         <div class="eqtools">
           <select id="lay-sheet" aria-label="Layout 도면 고르기"></select>
+          <div class="seg" id="lay-mode" role="group" aria-label="보기"><button type="button" data-v="3d" aria-pressed="true">3D</button><button type="button" data-v="2d" aria-pressed="false">도면</button></div>
+          <button type="button" id="lay-top" title="위에서 내려다보기">위에서</button>
           <div class="seg" role="group" aria-label="확대"><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
         </div>
       </div>
-      <div class="laywrap" id="lay-wrap"><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
+      <div class="lay3d" id="lay3d" aria-label="3D Layout: 끌어서 돌리기, Shift+끌기로 이동, 휠로 확대" role="img"><div class="l3tag" id="l3-tag" hidden></div><div class="muted laywait" id="l3-wait" hidden></div></div>
+      <div class="l3legend" id="l3-legend"></div>
+      <div class="laywrap" id="lay-wrap" hidden><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
       <div class="layinfo" id="lay-info" aria-live="polite"></div>
-      <p class="muted" style="margin:0">Layout·GA 도면 글자에서 찾은 설비 Tag를 PFD·P&amp;ID로 만든 Equipment List와 맞춰 표시합니다. 파란 상자는 목록에 있는 설비, 회색 점선은 목록에 없는 Tag입니다. 상자를 누르면 선택되고, 두 번 누르면 Equipment List의 그 설비로 이동합니다. 목록에서 행을 누르면 Layout에서 그 설비가 선택됩니다.</p>
+      <p class="muted" style="margin:0">Layout·GA 도면 글자에서 찾은 설비 Tag를 PFD·P&amp;ID로 만든 Equipment List와 맞춰 표시합니다. 3D는 도면을 바닥에 깔고 도면에 그려진 설비 외곽선(없으면 Tag 크기)을 평면으로, 높이는 설비 종류로 정한 추정값으로 세운 모형이며 색은 Area(패키지)입니다. 회색 반투명은 목록에 없는 Tag입니다. "도면" 보기에서는 파란 상자가 목록에 있는 설비, 회색 점선이 목록에 없는 Tag입니다. 설비를 누르면 선택되고, 두 번 누르면 Equipment List의 그 설비로 이동합니다. 목록에서 행을 누르면 Layout에서 그 설비가 선택됩니다.</p>
     </section>
 
     <section class="card" id="eq" hidden aria-label="Equipment List">
@@ -521,7 +531,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <span class="lab" id="v-mode-lab">흐름 보기</span>
         <div class="seg" id="v-mode" role="group" aria-labelledby="v-mode-lab"><button type="button" data-m="pkg" aria-pressed="true">패키지별</button><button type="button" data-m="eq" aria-pressed="false">설비별</button></div>
         <span class="muted" id="v-mode-st" aria-live="polite"></span>
-        <button type="button" id="pkg-make" hidden title="설비를 발주·공정 단위 패키지로 묶습니다. Claude 1회">패키지 묶기</button>
       </div>
       <div class="main">
         <div class="sheet">
@@ -610,7 +619,8 @@ const CDN = {
   pdfWorker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
   xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   mammoth: 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
-  dagre: 'https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js'
+  dagre: 'https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js',
+  three: 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js'
 };
 const loaded = {};
 function loadScript(url) {
@@ -835,8 +845,8 @@ async function readPdf(entry) {
       items.push({s, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys)});
     }
     items.sort((p1, p2) => p1.y0 - p2.y0 || p1.x0 - p2.x0);
-    // embedded raster images (stream tables are often pasted as scans)
-    const imgs = [];
+    // embedded raster images (stream tables are often pasted as scans) and drawn outlines (equipment footprints on a Layout)
+    const imgs = [], shapes = [];
     try {
       const ops = await page.getOperatorList(); let ctm = [1, 0, 0, 1, 0, 0]; const st = [];
       const paint = new Set([O.paintImageXObject, O.paintImageMaskXObject, O.paintInlineImageXObject, O.paintImageXObjectRepeat]);
@@ -846,6 +856,7 @@ async function readPdf(entry) {
         else if (fn === O.transform) ctm = U.transform(ctm, ar);
         else if (fn === O.paintFormXObjectBegin) { st.push(ctm.slice()); if (ar && ar[0]) ctm = U.transform(ctm, ar[0]); }
         else if (fn === O.paintFormXObjectEnd) ctm = st.pop() || ctm;
+        else if (fn === O.constructPath && shapes.length < 20000) pathBoxes(ar, ctm, vp, U, O, shapes);
         else if (paint.has(fn)) {
           const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(q => vp.convertToViewportPoint(...U.applyTransform(q, ctm)));
           const bx = [Math.min(...pts.map(q => q[0])) / vp.width, Math.min(...pts.map(q => q[1])) / vp.height, Math.max(...pts.map(q => q[0])) / vp.width, Math.max(...pts.map(q => q[1])) / vp.height];
@@ -861,7 +872,7 @@ async function readPdf(entry) {
     const badges = [...new Set(items.filter(it => isBadge(it.s) && it.y0 < 0.86).flatMap(it => it.s.split(/\s+/)))];
     const textTable = parseTextTable(items);
     const sh = {key: entry.file.name + ' p' + p, fileId: entry.id, file: entry.file.name, page: p, dwg: own, aliases, title,
-                connectors: conns, badges, items, imgs, textLayer: items.length > 40, textTable, rotate: page.rotate};
+                connectors: conns, badges, items, imgs, shapes, aspect: vp.width / vp.height, textLayer: items.length > 40, textTable, rotate: page.rotate};
     try { sh.grid = sheetGrid(items); sh.area = sheetArea(sh); sh.eq = extractEquipment(sh); } catch (e) { sh.eq = null; console.warn('equipment', sh.key, e); }
     sh.layTitle = ((items.find(it => LAY_TITLE.test(it.s)) || {}).s || '').slice(0, 40);
     (entry.role ? entry.role === 'layout' : isLayoutSheet(sh, entry.file.name)) ? S.layouts.push(sh) : S.sheets.push(sh);
@@ -869,6 +880,22 @@ async function readPdf(entry) {
     entry.status = `${p}/${doc.numPages}장 읽음`; renderFiles(); await sleep0();
   }
   entry.note = layNote(entry);
+}
+/* Bounding boxes (page fractions) of the closed shapes in one path operator: rectangles, outlines, circles. Lines and
+   tiny ticks are dropped; c = drawn with curves (a round tank or vessel in plan). */
+function pathBoxes(ar, ctm, vp, U, O, out) {
+  const ops = ar[0] || [], xy = ar[1] || []; let k = 0, box = null, curved = false, n = 0;
+  const pt = (x, y) => { const q = vp.convertToViewportPoint(...U.applyTransform([x, y], ctm)), u = q[0] / vp.width, v = q[1] / vp.height;
+    if (!box) box = [u, v, u, v]; else { box[0] = Math.min(box[0], u); box[1] = Math.min(box[1], v); box[2] = Math.max(box[2], u); box[3] = Math.max(box[3], v); } n++; };
+  const flush = () => { if (box && n > 2) { const w = box[2] - box[0], h = box[3] - box[1]; if (w > 0.004 && h > 0.004 && w < 0.5 && h < 0.5) out.push([...box.map(v => Math.round(v * 1e4) / 1e4), curved ? 1 : 0]); } box = null; curved = false; n = 0; };
+  for (const op of ops) {
+    if (op === O.moveTo) { flush(); pt(xy[k], xy[k + 1]); k += 2; }
+    else if (op === O.lineTo) { pt(xy[k], xy[k + 1]); k += 2; }
+    else if (op === O.curveTo) { pt(xy[k], xy[k + 1]); pt(xy[k + 2], xy[k + 3]); pt(xy[k + 4], xy[k + 5]); k += 6; curved = true; }
+    else if (op === O.curveTo2 || op === O.curveTo3) { pt(xy[k], xy[k + 1]); pt(xy[k + 2], xy[k + 3]); k += 4; curved = true; }
+    else if (op === O.rectangle) { flush(); const [x, y, w, h] = xy.slice(k, k + 4); pt(x, y); pt(x + w, y); pt(x, y + h); pt(x + w, y + h); k += 4; flush(); }
+  }
+  flush();
 }
 async function readXlsx(entry) {
   await loadScript(CDN.xlsx);
@@ -1174,58 +1201,42 @@ async function describeFlow(D, signal) {
   D.desc = {...out, at: Date.now()};
   return D.desc;
 }
-/* Packages: equipment grouped into purchase / unit-operation packages (the unit for investment cost). */
-function packPrompt(D) {
-  const NI = nodeInfoOf(D), ST = D.streams || {}, dn = (D.desc || {}).nodes || {};
-  const eq = (D.nodes || []).filter(isEquipNode).slice(0, 250).map(n => `${n.id} | ${n.title} | ${n.sub && n.sub !== n.id ? n.sub : ''} | ${(dn[n.id] || ((NI[n.id] || {}).info || []).join(' ')).slice(0, 140)}`);
-  const conns = linksOf(D).slice(0, 400).map(l => `${(ST[l.id] || {}).label || l.id} | ${l.from} → ${l.to} | ${(ST[l.id] || {}).ko || ''}`);
-  return `[[PACKAGES]]
-너는 EPC 공정 설계·견적 엔지니어다. 아래 공정 흐름도("${(D.meta || {}).title || ''}")의 설비를 패키지로 묶는다.
-패키지는 투자비 산출 단위로, 함께 발주·공급되거나 한 단위 공정을 이루는 설비 묶음이다.
-예: 반응조 + 교반기 + 공급 펌프, 필터프레스 + 공급 탱크 + 여액 펌프, 보일러 패키지, 증발·결정 패키지, 이온교환 패키지, 건조·포장 패키지.
-
-규칙
-- 목록의 설비 키만 쓰고, 한 설비는 한 패키지에만 넣는다. 가능한 모든 설비를 넣는다.
-- 흐름으로 이어지고 같은 공정 구역(Tag 앞 4자리)에 있는 설비끼리 묶는다. 보통 패키지 하나에 설비 2~8개. 단독으로 큰 설비는 혼자 패키지가 될 수 있다.
-- 패키지 순서는 공정 흐름 순서(원료 → 제품)로 한다.
-- name: 짧은 한국어 패키지 이름(예: "Lime 반응 패키지"). what: 패키지가 하는 일 한 문장.
-
-출력은 JSON 하나만:
-{"packages":[{"name":"Lime 반응 패키지","what":"염수에 소석회를 넣어 Mg를 침전시킨다","members":["3200-RX-005","3200-TK-001"]}]}
-
-## 설비 (키 | 이름 | Tag | 설명)
-${eq.join('\n')}
-
-## 연결 (Stream | From → To | 이름)
-${conns.join('\n')}`;
+/* Packages: one per process area — every equipment of area 3200 (the 4-digit area of its tag or drawing) is the
+   3200 package, named from what the drawings say about that area (title block "3200 - NAME"). Boxes without
+   an area (off-page ends, headers) join a neighbour's; battery limits stay outside. No Claude call. */
+function areaNamesOf(D) {
+  const names = {};
+  (S.sheets || []).forEach(sh => { if (sh.area && sh.area.code && sh.area.name && !names[sh.area.code]) names[sh.area.code] = sh.area.name; });
+  for (const [k, v] of Object.entries(EQ.areaNames || {})) if (!names[k]) names[k] = v;
+  (D.frames || []).forEach(f => { const m = String(f.title || '').match(/^(\d{4}) · (.+)$/); if (m && !names[m[1]]) names[m[1]] = m[2]; });
+  return names;
 }
-async function packFlow(D, signal) {
-  calls++;
-  const r = await SAMPLE.json(packPrompt(D), {signal, modelTier: 'default'});
-  const ok = new Set((D.nodes || []).filter(isEquipNode).map(n => n.id)), used = new Set(), out = [];
-  (r && Array.isArray(r.packages) ? r.packages : []).forEach(p => {
-    const ms = (Array.isArray(p.members) ? p.members : []).map(String).filter(m => ok.has(m) && !used.has(m)); if (!ms.length) return;
-    ms.forEach(m => used.add(m));
-    out.push({id: 'P' + (out.length + 1), name: String(p.name || '패키지 ' + (out.length + 1)).slice(0, 60), what: String(p.what || '').slice(0, 300), members: ms});
+function areaPackages(D) {
+  const N = D.nodes || [], byId = {}, area = {}; N.forEach(n => { byId[n.id] = n; area[n.id] = n.src ? null : areaOf(n); });
+  (D.bars || []).forEach(b => { if (b.node && !(b.node in area)) area[b.node] = null; });
+  const links = linksOf(D), open = id => id in area && !(byId[id] && byId[id].src);
+  for (let pass = 0; pass < 4; pass++) links.forEach(l => {
+    if (open(l.from) && !area[l.from] && area[l.to]) area[l.from] = area[l.to];
+    if (open(l.to) && !area[l.to] && area[l.from]) area[l.to] = area[l.from];
   });
-  if (!out.length) throw {code: 'invalid_json'};
-  D.packages = out; PKV.delete(D);
-  return out;
+  const names = areaNamesOf(D), by = {};
+  Object.entries(area).forEach(([id, a]) => { if (a) (by[a] = by[a] || []).push(id); });
+  return Object.keys(by).sort().map(a => {
+    const eq = by[a].filter(id => byId[id] && isEquipNode(byId[id])), kinds = {};
+    eq.forEach(id => { const n = byId[id], t = streamTags(n.id + ' ' + (n.sub || ''))[0], code = t ? t.split('-')[1] : ''; const k = eqKind(code, n.title || '') || '기타'; kinds[k] = (kinds[k] || 0) + 1; });
+    const what = `설비 ${eq.length}기` + (eq.length ? ': ' + Object.entries(kinds).sort((x, y) => y[1] - x[1]).map(([k, c]) => `${k} ${c}`).join(', ') : '');
+    return {id: 'A' + a, area: a, name: names[a] ? `${a} ${names[a]}` : `${a} Area`, what, members: by[a]};
+  }).filter(p => p.members.some(id => byId[id] && isEquipNode(byId[id])));
 }
-async function packCurrent() {
-  if (!S.result || busy()) return;
-  const st = $('#v-mode-st');
-  try {
-    SAMPLE = SAMPLE || (window.claude ? await window.claude.use('sample') : null);
-    if (!SAMPLE) { st.textContent = 'Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다.'; return; }
-    DESC_JOB.running = true; DESC_JOB.ctl = new AbortController(); updateViewBar(); updateDescButton();
-    st.textContent = '설비를 패키지로 묶는 중… (Claude)';
-    const D = S.result; await packFlow(D, DESC_JOB.ctl.signal);
-    DESC_JOB.running = false; S.viewMode = 'pkg';
-    if (S.result === D) await showView();
-    if (S.project && S.bundle) await saveRecord();
-  } catch (e) { DESC_JOB.running = false; updateViewBar(); st.textContent = errText(e); }
-  finally { DESC_JOB.running = false; updateDescButton(); $('#pkg-make').disabled = busy(); }
+function packFlow(D) {
+  D.packages = areaPackages(D); D.packBy = 'area'; PKV.delete(D);
+  return D.packages;
+}
+function nameAreaPackages(B) {   // area names that arrive after the flow opened (the example's equipment list)
+  for (const t of (B && B.tabs) || []) {
+    const D = t.flow, names = areaNamesOf(D); if (D.packBy !== 'area') continue;
+    (D.packages || []).forEach(p => { if (names[p.area]) p.name = `${p.area} ${names[p.area]}`; }); PKV.delete(D);
+  }
 }
 const DESC_JOB = {running: false, ctl: null};
 async function describeCurrent() {
@@ -1252,7 +1263,7 @@ async function describeCurrent() {
 const STEP_DEFS = [
   ['read', '파일 읽기', '브라우저'], ['sheets', '시트 식별·시트 간 연결', '브라우저'], ['scope', '계통 범위 판단', 'Claude'],
   ['topo', '시트 안 연결 해석', 'Claude'], ['values', 'Stream 값 채우기', '브라우저·Claude'], ['check', '물질수지·시트 간 비교', '브라우저'],
-  ['draw', '자동 배치·그리기', '브라우저'], ['desc', '설비·라인 설명 작성', 'Claude'], ['pkg', '패키지 묶기', 'Claude']];
+  ['draw', '자동 배치·그리기', '브라우저'], ['desc', '설비·라인 설명 작성', 'Claude'], ['pkg', 'Area별 패키지 묶기', '브라우저']];
 const stepState = {};
 function setStep(k, st, det) {
   stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps();
@@ -1367,9 +1378,7 @@ async function generate(mode) {
       setStep('desc', 'run');
       try { const d = await describeFlow(D, S.ctl.signal); setStep('desc', 'done', `설비 ${Object.keys(d.nodes).length} · 라인 ${Object.keys(d.streams).length}`); }
       catch (e) { if (e && e.code === 'cancelled') throw e; setStep('desc', 'fail', errText(e) + ' · 결과 화면의 "설명 작성"으로 다시 할 수 있습니다'); }
-      setStep('pkg', 'run');
-      try { const pk = await packFlow(D, S.ctl.signal); setStep('pkg', 'done', `패키지 ${pk.length}개 · 설비 ${pk.reduce((a, x) => a + x.members.length, 0)}개`); }
-      catch (e) { if (e && e.code === 'cancelled') throw e; setStep('pkg', 'fail', errText(e) + ' · 결과 화면의 "패키지 묶기"로 다시 할 수 있습니다'); }
+      const pk = packFlow(D); setStep('pkg', pk.length ? 'done' : 'skip', pk.length ? `Area ${pk.length}개 = 패키지 ${pk.length}개 (${pk.map(x => x.area).join(', ')})` : 'Tag·도면에서 Area 번호를 찾지 못함');
       tabs.push({key: job.main ? 'main' : 'sys-' + Date.now() + '-' + tabs.length, label: job.main ? 'Main Stream' : (D.meta.title || job.system), main: job.main, flow: D});
     }
     if (add) { S.bundle.tabs.push(...tabs); S.bundle.active = S.bundle.tabs.length - 1; $('#r-sys').value = ''; }
@@ -1495,7 +1504,8 @@ function assemble({system, sc, cats, topo, vals, main, side}) {
    very wide) is laid out one process area per row, rows stacked top to bottom in flow order; links
    between neighbouring rows run in the gap between them, recycles and row-skipping links run in lanes
    down the left margin. */
-const NODE_SIZE = n => n.src ? [170, 46] : [190, 64];
+const NODE_SIZE = n => n.src ? [170, 46] : n.pkg ? [250, 64] : [190, 64];
+const fitTitle = n => { const t = n.title || '', k = n.pkg ? 27 : 24; return t.length > k ? t.slice(0, k - 1) + '…' : t; };
 /* Equipment of a flow: drawn boxes that are not battery limits, headers or off-page ends. */
 const isEquipNode = n => !n.src && !/^(HDR|OFF|BL):/.test(n.id);
 function linksOf(D) {   // stream ends as box ids: links may name tags (hand-made flows); without links, read the line end points
@@ -1550,7 +1560,7 @@ function layout(D) {
   const rows = areas.length >= 2 && (D.meta.main || gr.width > 1800);
   D.links = D.edges.map(e => ({id: e.id, from: e.from, to: e.to, ...(e.unc ? {unc: true} : {})}));   // equipment ends of each stream (the equipment list reads them)
   if (!rows) {
-    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src, pkg: n.pkg}; });
+    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: fitTitle(n), sub: n.sub, src: n.src, pkg: n.pkg}; });
     D.lines = edges.map(e => { const ed = g.edge({v: e.from, w: e.to, name: e.key}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
     D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
     delete D.edges; return;
@@ -1616,7 +1626,7 @@ function layout(D) {
   });
   const names = {}; (S.sheets || []).forEach(sh => { if (sh.area && sh.area.code && sh.area.name) names[sh.area.code] = sh.area.name; });
   D.frames = rowBox.map((b, i) => ({x: b.x - 12, y: b.y - 26, w: b.w + 24, h: b.h + 36, title: areas[i] === '?' ? '기타' : `${areas[i]}${names[areas[i]] ? ' · ' + names[areas[i]] : ''}`, ty: b.y - 10}));
-  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: n.title.slice(0, 24), sub: n.sub, src: n.src, pkg: n.pkg}));
+  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: fitTitle(n), sub: n.sub, src: n.src, pkg: n.pkg}));
   D.lines = lines;
   D.meta.viewBox = [Math.ceil(marginL + Math.max(...rowBox.map(b => b.w)) + 40), Math.ceil(y + 30)];
   D.meta.minWidth = Math.max(D.meta.minWidth || 0, 1100);
@@ -1785,30 +1795,31 @@ function updateDescButton() {
   $('#d-desc').textContent = has ? '설명 다시 작성' : '설명 작성';
   $('#d-desc').disabled = S.running || DESC_JOB.running;
 }
-/* Package view: each package (flow.packages, grouped by Claude) is drawn as one box; streams between
+/* Package view: each package (flow.packages, one per area) is drawn as one box; streams between
    packages are the lines, streams inside a package are listed on its card. Derived on the fly, never saved. */
 const PKV = new WeakMap();
 function packageView(D) {
   const P = D.packages || []; if (!P.length) return null;
   if (PKV.has(D)) return PKV.get(D);
   const NI0 = nodeInfoOf(D), byId = {}; (D.nodes || []).forEach(n => { byId[n.id] = n; });
-  const of = {}; P.forEach(p => p.members.forEach(m => { if (byId[m] && !of[m]) of[m] = p.id; }));
+  const bar = new Set((D.bars || []).map(b => b.node).filter(Boolean));
+  const of = {}; P.forEach(p => p.members.forEach(m => { if ((byId[m] || bar.has(m)) && !of[m]) of[m] = p.id; }));
   const pid = id => of[id] ? 'PKG:' + of[id] : id;
   const edges = [], internal = {};
   linksOf(D).forEach(l => { const f = pid(l.from), t = pid(l.to); if (f === t) (internal[f] = internal[f] || new Set()).add(l.id); else edges.push({id: l.id, from: f, to: t, unc: !!l.unc}); });
   const touching = id => [...new Set(edges.filter(e => e.from === id || e.to === id).map(e => e.id))];
   const nodes = [], nodeInfo = {}, descN = {}, dn = (D.desc || {}).nodes || {};
   P.forEach(p => {
-    const ms = p.members.filter(m => of[m] === p.id); if (!ms.length) return;
+    const ms = p.members.filter(m => of[m] === p.id && byId[m] && isEquipNode(byId[m])); if (!ms.length) return;
     const id = 'PKG:' + p.id, areas = ms.map(m => areaOf(byId[m])).filter(Boolean);
-    const area = areas.sort((a, b) => areas.filter(x => x === b).length - areas.filter(x => x === a).length)[0] || null;
+    const area = p.area || areas.sort((a, b) => areas.filter(x => x === b).length - areas.filter(x => x === a).length)[0] || null;
     nodes.push({id, title: p.name, sub: `패키지 · 설비 ${ms.length}`, pkg: true, area});
     nodeInfo[id] = {title: p.name, tags: `패키지 · 설비 ${ms.length}개`, info: [], links: touching(id), pkg: true,
       members: ms.map(m => ({id: m, title: byId[m].title, tag: byId[m].sub && byId[m].sub !== m && !/패키지/.test(byId[m].sub) ? byId[m].sub : (/^[A-Z]{0,3}-?\d{4}-/.test(m) ? m : '')})), internal: [...(internal[id] || [])]};
     if (p.what) descN[id] = p.what;
   });
   const seen = new Set((D.nodes || []).map(n => n.id));
-  (D.bars || []).forEach(b => { if (!b.node || seen.has(b.node) || !edges.some(e => e.from === b.node || e.to === b.node)) return; seen.add(b.node);   // headers drawn as bars become boxes
+  (D.bars || []).forEach(b => { if (!b.node || seen.has(b.node) || of[b.node] || !edges.some(e => e.from === b.node || e.to === b.node)) return; seen.add(b.node);   // headers drawn as bars become boxes
     nodes.push({id: b.node, title: ((NI0[b.node] || {}).title || String(b.label || b.node).split('·')[0]).trim(), sub: '헤더'}); nodeInfo[b.node] = {title: (NI0[b.node] || {}).title || b.label || b.node, tags: '헤더', info: (NI0[b.node] || {}).info || [], links: touching(b.node)}; });
   (D.nodes || []).forEach(n => {
     if (of[n.id]) return;
@@ -1833,8 +1844,7 @@ function updateViewBar() {
   document.querySelectorAll('#v-mode [data-m]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.m === 'pkg') === pkg)));
   $('#v-mode [data-m="pkg"]').disabled = !has;
   const eq = (D.nodes || []).filter(isEquipNode), ids = new Set(eq.map(n => n.id)), packed = has ? new Set(D.packages.flatMap(p => p.members).filter(m => ids.has(m))).size : 0;
-  $('#v-mode-st').textContent = !has ? `설비 ${eq.length}개 · 아직 패키지로 묶지 않았습니다` : `패키지 ${D.packages.length}개 · 설비 ${eq.length}개 중 ${packed}개 묶음${eq.length - packed ? ` · 패키지 밖 ${eq.length - packed}개` : ''}`;
-  $('#pkg-make').hidden = !window.claude; $('#pkg-make').textContent = has ? '패키지 다시 묶기' : '패키지 묶기'; $('#pkg-make').disabled = busy();
+  $('#v-mode-st').textContent = !has ? `설비 ${eq.length}개 · Tag·도면에서 Area 번호를 찾지 못해 패키지로 묶지 않았습니다` : `Area별 패키지 ${D.packages.length}개 · 설비 ${eq.length}개 중 ${packed}개 묶음${eq.length - packed ? ` · 패키지 밖 ${eq.length - packed}개` : ''}`;
 }
 async function openEquip(id) {   // from a package card: the equipment view, that equipment selected
   S.viewMode = 'eq'; await showView();
@@ -1848,6 +1858,7 @@ function asBundle(x) {
 }
 async function prepFlow(D) {   // a flow given as topology only (nodes + edges, no drawing) is laid out on first open
   if (!D.lines && D.edges) { await loadScript(CDN.dagre); layout(D); }
+  if (D.packBy !== 'area') packFlow(D);
   return D;
 }
 async function showBundle(B, fromSaved) {
@@ -1980,7 +1991,7 @@ function resetWork() {
   $('#eq-q').value = ''; $('#system').value = ''; $('#r-sys').value = ''; $('#suggest').innerHTML = '';
   Object.keys(stepState).forEach(k => delete stepState[k]); renderSteps(); say('');
   renderFiles(); renderLocal(); $('#eq').hidden = true; $('#result').hidden = true; V = null;
-  Object.assign(LAY, {sel: null, sheet: 0, z: 1, idx: null, shown: '', marks: ''}); LAY.img.clear(); $('#lay').hidden = true; $('#lay-img').dataset.k = ''; $('#lay-info').innerHTML = '';
+  Object.assign(LAY, {sel: null, sheet: 0, z: 1, idx: null, shown: '', marks: ''}); L3.key = ''; $('#l3-legend').innerHTML = ''; $('#l3-tag').hidden = true; LAY.img.clear(); $('#lay').hidden = true; $('#lay-img').dataset.k = ''; $('#lay-info').innerHTML = '';
 }
 function renderProjectHead() {
   const p = S.project, X = !p && S.viewProject;
@@ -2579,7 +2590,7 @@ async function pageImage(sh, maxW, maxScale = 4) {   // one PDF page as a JPEG d
 const LAY_TITLE = /GENERAL\s+ARRANGEMENT|PLOT\s+PLAN|LAY-?OUT|EQUIPMENT\s+ARRANGEMENT|ARRANGEMENT\s+(?:PLAN|DRAWING)|배치도/i;
 const LAY_FILE = /lay-?out|plot.?plan|general.?arr|(?:^|[^a-z])ga(?:[^a-z]|$)|배치/i;
 const LAY_NOT = /PROCESS\s+FLOW\s+DIAGRAM|PIPING\s+(?:AND|&)\s+INSTRUMENT|\bP\s*&\s*ID\b|MASS\s+BALANCE|STREAM\s+TABLE/i;
-const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve()};
+const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve(), mode: '3d'};
 function isLayoutSheet(sh, fileName) {
   if (sh.dwg || sh.title) return false;
   const block = sh.items.filter(it => it.y0 > 0.7 && it.x0 > 0.5).map(it => it.s).join(' ');
@@ -2624,8 +2635,9 @@ function renderLayout(force) {
   $('#lay-sheet').disabled = X.sheets.length < 2;
   for (const k of LAY.img.keys()) if (!S.layouts.some(sh => sh.key === k)) LAY.img.delete(k);
   if (LAY.sel) layInfo(LAY.sel);
-  return drawLayout();
+  return drawCurrent();
 }
+const drawCurrent = () => LAY.mode === '2d' ? drawLayout() : draw3D();
 async function drawLayout() {   // the sheet's picture (rendered once per sheet), then its marks; the selection is repainted every time
   const L = LAY.idx && LAY.idx.sheets[LAY.sheet]; if (!L) return;
   const img = $('#lay-img'), key = L.sh.key;
@@ -2666,7 +2678,8 @@ async function layoutSelect(key, fromList) {
   const w = X.where.get(key) || [];
   $('#eq-tbl').querySelectorAll('tr[data-i]').forEach(tr => tr.classList.toggle('lsel', (X.rowsOf.get(key) || []).includes(+tr.dataset.i)));
   layInfo(key);
-  if (w.length && !w.includes(LAY.sheet)) { LAY.sheet = w[0]; await renderLayout(true); } else await drawLayout();
+  if (w.length && !w.includes(LAY.sheet)) { LAY.sheet = w[0]; await renderLayout(true); } else await drawCurrent();
+  if (LAY.mode !== '2d') { focus3D(key, fromList); return; }
   const el = $('#lay-marks').querySelector(`.lmk[data-k="${CSS.escape(key)}"]`); if (!el || !fromList) return;
   const b = X.sheets[LAY.sheet].marks.find(m => m.key === key).box;
   layZoom(Math.max(LAY.z, 2.5), [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]);
@@ -2699,7 +2712,133 @@ function gotoRow(key) {   // the list scrolls to the equipment and flashes its r
 $('#lay-marks').addEventListener('click', e => { const b = e.target.closest('.lmk'); if (b) layoutSelect(b.dataset.k, false); });
 $('#lay-marks').addEventListener('dblclick', e => { const b = e.target.closest('.lmk'); if (b) gotoRow(b.dataset.k); });
 $('#lay-sheet').addEventListener('change', e => { LAY.sheet = +e.target.value; renderLayout(true); });
-$('#lay').querySelectorAll('[data-z]').forEach(b => b.onclick = () => layZoom(b.dataset.z));
+$('#lay').querySelectorAll('[data-z]').forEach(b => b.onclick = () => LAY.mode === '2d' ? layZoom(b.dataset.z) : zoom3D(b.dataset.z));
+$('#lay-mode').querySelectorAll('[data-v]').forEach(b => b.onclick = () => setLayMode(b.dataset.v));
+$('#lay-top').onclick = () => { if (!L3.cam) return; L3.el = L3.el > 1.4 ? 0.85 : 1.5; render3D(); $('#lay-top').textContent = L3.el > 1.4 ? '비스듬히' : '위에서'; };
+function setLayMode(m) {
+  LAY.mode = m; $('#lay-mode').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === m)));
+  $('#lay3d').hidden = $('#lay-top').hidden = m === '2d'; $('#l3-legend').hidden = m === '2d'; $('#lay-wrap').hidden = m !== '2d';
+  drawCurrent();
+}
+
+/* ---- 3D Layout (three.js): the drawing on the floor, each equipment raised on its drawn footprint ----
+   Footprint: the smallest closed outline drawn around the tag label (a circle → a cylinder), else a square the size
+   of the label. Height: the footprint's short side × a factor for the kind (tanks tall, ponds flat) — an estimate;
+   GA drawings rarely carry elevations in their text. Colour: the area, as in the area packages. */
+const L3 = {r: null, scene: null, cam: null, objs: [], key: '', az: -0.75, el: 0.85, dist: 100, tgt: [50, 0, 35], W: 100, H: 70, home: null};
+const AREA_COL = ['#1d5fae', '#0d8478', '#6a4bc0', '#a07400', '#3c7d3c', '#4a6f8a', '#8a5a2b', '#2f8fb0'];   // red is kept for the selection
+const KIND_H = {'탱크': 1.3, '반응조': 1.4, '시크너·청징조': 0.35, '폰드': 0.12, '펌프': 0.55, '필터': 0.9, '열교환기': 0.5, '빈·호퍼': 1.6, '믹서': 1.1, '보일러': 1.1,
+  '팬·블로어': 0.7, '컨베이어': 0.25, '건조기': 0.8, '스크러버': 2, '공기 저장조': 1.6, '교반기': 1.2, '압축기': 0.7, '이온교환탑': 1.8, '사이클론': 2};
+function footprintOf(sh, box, taken) {
+  const cx = (box[0] + box[2]) / 2, cy = (box[1] + box[3]) / 2, tw = box[2] - box[0], th = box[3] - box[1];
+  let best = null;
+  for (const s of sh.shapes || []) {
+    const a = (s[2] - s[0]) * (s[3] - s[1]);
+    if (a < tw * th * 3 || a > 0.06 || cx < s[0] || cx > s[2] || cy < s[1] || cy > s[3]) continue;
+    if (!best || a < best.a) best = {s, a};
+  }
+  const id = best && best.s.slice(0, 4).join(',');
+  if (best && !taken.has(id)) { taken.add(id); return {b: best.s.slice(0, 4), round: !!best.s[4], drawn: true}; }
+  const r = Math.max(tw * 0.7, th * 4);   // no outline of its own (or shared with another tag): a block the size of the label
+  return {b: [cx - r / 2, cy - r / 2, cx + r / 2, cy + r / 2], round: false, drawn: false};
+}
+async function draw3D() {
+  const X = LAY.idx, L = X && X.sheets[LAY.sheet], box = $('#lay3d'), wait = $('#l3-wait'); if (!L) return;
+  if (!window.THREE) { wait.textContent = '3D를 준비하는 중…'; wait.hidden = false; try { await loadScript(CDN.three); } catch (e) { wait.textContent = '3D 라이브러리를 불러오지 못했습니다. "도면" 보기를 쓰세요.'; return; } }
+  if (!L3.r) {
+    try { L3.r = new THREE.WebGLRenderer({antialias: true}); } catch (e) { wait.textContent = '이 브라우저는 3D(WebGL)를 쓸 수 없습니다. "도면" 보기를 쓰세요.'; wait.hidden = false; return; }
+    L3.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); box.prepend(L3.r.domElement); wire3D(L3.r.domElement);
+    new ResizeObserver(() => { if (box.clientWidth) render3D(); }).observe(box);
+  }
+  const key = L.sh.key + '#' + X.sig;
+  if (L3.key !== key) {
+    wait.textContent = '3D를 만드는 중…'; wait.hidden = false;
+    let url = LAY.img.get(L.sh.key);
+    if (!url) { try { url = await pageImage(L.sh, 2400, 3); LAY.img.set(L.sh.key, url); } catch (e) { url = null; } }
+    if (X !== LAY.idx || L !== LAY.idx.sheets[LAY.sheet]) return;   // the sheet changed meanwhile
+    build3D(L, url); L3.key = key;
+  }
+  wait.hidden = true; paint3D(); render3D();
+}
+function build3D(L, url) {
+  const T = THREE, old = L3.scene;
+  if (old) old.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+  const W = 100, H = 100 / (L.sh.aspect || 1.414), sc = new T.Scene(); sc.background = new T.Color(0xe9ece8);
+  sc.add(new T.HemisphereLight(0xffffff, 0x8a9096, 0.9)); const sun = new T.DirectionalLight(0xffffff, 0.75); sun.position.set(-40, 90, -30); sc.add(sun);
+  const floor = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshBasicMaterial({color: 0xffffff}));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(W / 2, 0, H / 2); sc.add(floor);
+  if (url) new T.TextureLoader().load(url, tx => { if ('colorSpace' in tx) tx.colorSpace = T.SRGBColorSpace; else tx.encoding = T.sRGBEncoding; tx.anisotropy = 4; floor.material.map = tx; floor.material.needsUpdate = true; render3D(); });
+  const areas = [...new Set(L.marks.filter(m => m.rows.length).map(m => m.key.slice(0, 4)))].sort(), col = a => AREA_COL[Math.max(0, areas.indexOf(a)) % AREA_COL.length];
+  const taken = new Set(), seen = new Set(); L3.objs = [];
+  [...L.marks].sort((a, b) => (b.rows.length > 0) - (a.rows.length > 0)).forEach(m => {
+    if (seen.has(m.key)) return; seen.add(m.key);
+    const r = m.rows.length ? EQ.rows[m.rows[0]] : null, f = footprintOf(L.sh, m.box, taken);
+    const w = Math.max(0.6, (f.b[2] - f.b[0]) * W), d = Math.max(0.6, (f.b[3] - f.b[1]) * H);
+    const h = Math.min(30, Math.max(0.8, Math.min(w, d) * (r ? KIND_H[r.kind] || 0.8 : 0.5)));
+    const geo = f.round ? new T.CylinderGeometry((w + d) / 4, (w + d) / 4, h, 32) : new T.BoxGeometry(w, h, d);
+    const mat = new T.MeshStandardMaterial({color: r ? col(m.key.slice(0, 4)) : 0x9aa4b0, roughness: 0.75, transparent: !r, opacity: r ? 1 : 0.35});
+    const o = new T.Mesh(geo, mat); o.position.set((f.b[0] + f.b[2]) / 2 * W, h / 2, (f.b[1] + f.b[3]) / 2 * H);
+    o.add(new T.LineSegments(new T.EdgesGeometry(geo, 30), new T.LineBasicMaterial({color: 0x1b2326, transparent: true, opacity: 0.45})));
+    o.userData = {key: m.key, base: mat.color.getHex(), h, listed: !!r};
+    sc.add(o); L3.objs.push(o);
+  });
+  const names = areaNamesOf({});
+  $('#l3-legend').innerHTML = areas.map(a => { const n = names[a]; return `<span><i style="background:${col(a)}"></i>${esc(a)}${n ? ' ' + esc(n) : ''}</span>`; }).join('')
+    + (L3.objs.some(o => !o.userData.listed) ? '<span><i style="background:#9aa4b0;opacity:.5"></i>목록에 없는 Tag</span>' : '');
+  L3.scene = sc; L3.W = W; L3.H = H; L3.tgt = [W / 2, 0, H / 2]; L3.dist = Math.max(W, H) * 1.15; L3.az = -0.75; L3.el = 0.85;
+  if (!L3.cam) L3.cam = new T.PerspectiveCamera(40, 1.6, 0.1, 5000);
+}
+function render3D() {
+  const R = L3.r, box = $('#lay3d'); if (!R || !L3.scene || !box.clientWidth) return;
+  const w = box.clientWidth, h = box.clientHeight, cam = L3.cam, c = Math.cos(L3.el);
+  if (R.domElement.width !== Math.round(w * R.getPixelRatio()) || R.domElement.height !== Math.round(h * R.getPixelRatio())) { R.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+  cam.position.set(L3.tgt[0] + L3.dist * c * Math.sin(L3.az), L3.tgt[1] + L3.dist * Math.sin(L3.el), L3.tgt[2] + L3.dist * c * Math.cos(L3.az));
+  cam.up.set(0, 1, 0); if (L3.el > 1.4) cam.up.set(0, 0, -1); cam.lookAt(...L3.tgt);
+  R.render(L3.scene, cam);
+  const o = L3.objs.find(x => x.userData.key === LAY.sel), tag = $('#l3-tag');
+  if (!o) { tag.hidden = true; return; }
+  const p = o.position.clone(); p.y = o.userData.h; p.project(cam);
+  tag.hidden = p.z > 1; tag.textContent = o.userData.key; tag.style.left = (p.x + 1) / 2 * w + 'px'; tag.style.top = (1 - p.y) / 2 * h + 'px';
+}
+function paint3D() {
+  L3.objs.forEach(o => { const on = o.userData.key === LAY.sel; o.material.color.setHex(on ? 0xe0301e : o.userData.base); o.material.emissive && o.material.emissive.setHex(on ? 0x5a0d06 : 0); });
+}
+function focus3D(key, fromList) {
+  paint3D();
+  const o = L3.objs.find(x => x.userData.key === key);
+  if (o && fromList) { L3.tgt = [o.position.x, 0, o.position.z]; L3.dist = Math.min(L3.dist, Math.max(25, o.userData.h * 6)); }
+  render3D();
+  if (fromList) { const r = $('#lay3d').getBoundingClientRect(); if (r.bottom < 60 || r.top > innerHeight - 60) $('#lay3d').scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+}
+function zoom3D(k) {
+  if (!L3.cam) return;
+  if (k === 'fit') { L3.tgt = [L3.W / 2, 0, L3.H / 2]; L3.dist = Math.max(L3.W, L3.H) * 1.15; L3.az = -0.75; L3.el = 0.85; $('#lay-top').textContent = '위에서'; }
+  else L3.dist = Math.max(5, Math.min(400, L3.dist * (k === '+' ? 1 / 1.4 : 1.4)));
+  render3D();
+}
+function pick3D(e) {
+  const c = L3.r.domElement, b = c.getBoundingClientRect(), ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - b.left) / b.width * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1), L3.cam);
+  const hit = ray.intersectObjects(L3.objs, false)[0];
+  return hit ? hit.object.userData.key : null;
+}
+function wire3D(c) {   // drag: turn · Shift/right drag: move · wheel: zoom · click: select · double click: go to the list row
+  let down = null, moved = 0;
+  c.addEventListener('contextmenu', e => e.preventDefault());
+  c.addEventListener('pointerdown', e => { down = {x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2}; moved = 0; c.setPointerCapture(e.pointerId); c.classList.add('drag'); });
+  c.addEventListener('pointermove', e => {
+    if (!down) { const k = L3.scene && pick3D(e), rows = k ? (LAY.idx.rowsOf.get(k) || []) : []; c.title = k ? k + (rows.length ? ' · ' + (EQ.rows[rows[0]].name || '') : ' · Equipment List에 없음') : ''; return; }
+    const dx = e.clientX - down.x, dy = e.clientY - down.y; down.x = e.clientX; down.y = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+    if (down.pan) { const s = L3.dist / 600, ca = Math.cos(L3.az), sa = Math.sin(L3.az);
+      L3.tgt = [L3.tgt[0] - (dx * ca + dy * sa) * s, 0, L3.tgt[2] - (-dx * sa + dy * ca) * s]; }
+    else { L3.az -= dx * 0.008; L3.el = Math.max(0.12, Math.min(1.5, L3.el + dy * 0.006)); }
+    render3D();
+  });
+  const up = e => { if (!down) return; down = null; c.classList.remove('drag'); if (moved < 5 && e.type === 'pointerup') { const k = pick3D(e); if (k) layoutSelect(k, false); } };
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  c.addEventListener('dblclick', e => { const k = pick3D(e); if (k) gotoRow(k); });
+  c.addEventListener('wheel', e => { e.preventDefault(); L3.dist = Math.max(5, Math.min(400, L3.dist * (e.deltaY > 0 ? 1.12 : 1 / 1.12))); render3D(); }, {passive: false});
+}
 
 /* ---- Excel ---- */
 async function downloadEquipment() {
@@ -3345,7 +3484,7 @@ async function openExample() {
   if (E && E.rows) {
     Object.assign(EQ, {rows: JSON.parse(JSON.stringify(E.rows)), refsMissing: E.refsMissing || [], areaNames: E.areaNames || {}, sample: {label, file: E.file, sheets: E.sheets}, state: 'done', cost: E.cost ? JSON.parse(JSON.stringify(E.cost)) : null, costSig: ''});
     $('#eq').hidden = false; eqProgress(100, `${label} · 설비 ${EQ.rows.length}건 (PDF ${E.sheets}장에서 만든 결과)`, 'done');
-    linkEquipmentToFlow();
+    linkEquipmentToFlow(); nameAreaPackages(S.bundle); await showView();
   }
   renderEquipment();
   $('#r-status').textContent = `${label}입니다. 실제 PFD에서 만든 결과이며 Claude를 부르지 않았습니다. 저장되지 않는 보기입니다${exampleProject() ? ' — "내 실적으로 가져오기"를 누르면 프로젝트로 저장됩니다' : ''}.`;
@@ -3393,6 +3532,5 @@ document.querySelectorAll('#panel .seg [data-f]').forEach(b => b.onclick = () =>
 $('#d-q').addEventListener('input', applyDetailFilter);
 $('#d-desc').onclick = describeCurrent;
 document.querySelectorAll('#v-mode [data-m]').forEach(b => b.onclick = () => { if (b.disabled || S.viewMode === b.dataset.m) return; S.viewMode = b.dataset.m; showView(); });
-$('#pkg-make').onclick = packCurrent;
 renderSteps(); go('home'); initStore();
 </script>

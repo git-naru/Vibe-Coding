@@ -59,11 +59,11 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 | 2 | Stream Table 행 → 뷰어 항목 | `parseTextTable`, `parseXlsxTables` |
 | 3 | 파일 읽기 (브라우저) | `readPdf`, `readXlsx`(설비비 목록 자동 인식), `readDocx`, `addFiles`, `finishEquipment` |
 | 4 | Claude에 보낼 도면 조각 렌더 | 타일·크롭 |
-| 5 | Claude 호출 | `ask`, `scopePrompt`, `topoPrompt`, `tablePrompt`, `descPrompt`/`describeFlow`, `packPrompt`/`packFlow` |
+| 5 | Claude 호출 | `ask`, `scopePrompt`, `topoPrompt`, `tablePrompt`, `descPrompt`/`describeFlow`; 패키지는 Claude 없이 `areaPackages`/`packFlow`(Area별) |
 | 6 | 생성 파이프라인 | `STEP_DEFS`, `buildFlow`, `generate`, `assemble`, `layout`(구역별 줄 배치), `linksOf`, `nodeInfoOf` |
 | 7 | 뷰어 | `renderViewer`(흐름도 + 상세설명 카드), `showBundle`, `packageView`(패키지별 보기), `showView`, 탭 |
 | 8 | 프로젝트·기록 저장 | `store`(db 또는 메모리), `saveRecord`(60,000자 part 분할), `openRecord`, `loadLegacy`, `importJson` |
-| 10 | Equipment List, Layout·GA | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `pageImage`, `runVision`(그림 판독), `downloadEquipment`; Layout: `LAY`, `isLayoutSheet`, `layoutIndex`(Tag 맞춤), `renderLayout`/`drawLayout`, `layoutSelect`, `gotoRow`, `setFileRole`(파일 시트를 Layout↔PFD로) |
+| 10 | Equipment List, Layout·GA | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `pageImage`, `runVision`(그림 판독), `downloadEquipment`; Layout: `LAY`, `isLayoutSheet`, `layoutIndex`(Tag 맞춤), `renderLayout`/`drawLayout`, `layoutSelect`, `gotoRow`, `setFileRole`(파일 시트를 Layout↔PFD로); 3D: `L3`, `pathBoxes`(도면 외곽선), `footprintOf`, `draw3D`/`build3D`/`render3D`, `wire3D`(돌리기·이동·확대·선택), `setLayMode`(3D↔도면) |
 | 11 | 설비비 매칭 | `normTag`, `expandTags`, `parseCostWorkbook`, `computeCosts(C, rows)`, `costOfNodes`, `costAi` |
 | 12 | 공사물량·투자비 산출 | `capOf`, `bundlePackages`, `resolveTarget`, `readQtyFile`, `RATES`/`EXP_DEFAULT`, `learnFrom`, `estEquipment`, `estQuantities`, `estCompute`, `downloadEstimate` |
 | 9 | 화면 연결(마지막) | 버튼 핸들러, `openExample`, `adoptExample`, `go`(화면 이동) |
@@ -80,7 +80,6 @@ claude.ai capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "dow
 | `[[TOPOLOGY 도면]]` | 시트마다 설비 간 연결 (도면 이미지 + 글자 위치) | 시트당 1 |
 | `[[TABLE 도면]]` | Stream Table이 이미지인 시트의 표 판독 | 해당 시트당 1 |
 | `[[DESCRIBE]]` | 설비·라인 역할 설명 (항목 70개 넘으면 설비/라인 나눠 2회) | 탭당 1~2 |
-| `[[PACKAGES]]` | 설비를 발주·공정 단위 패키지로 묶기 | 탭당 1 |
 | `[[EQUIP-VISION 시트]]` | "그림으로 설비 찾기" (도면 4조각) | 시트당 1, 버튼 |
 | `[[COST-MATCH]]` | 설비비 목록 중 Tag·이름으로 안 맞은 행 짝짓기 | 1, 버튼 |
 
@@ -119,7 +118,8 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 | `tabs.js` | 메인 + 계통 탭, 탭 추가, 저장·다시 열기, JSON 왕복 |
 | `eqtest.js`, `vis.js` | Equipment List(진행률·10행·PFD 새 창·Excel), 그림으로 설비 찾기·중지·이어하기 |
 | `layout.js`, `laycls.js` | Layout 카드 위치·Tag 맞춤(약식 Tag·목록에 없는 Tag)·선택·더블클릭 목록 이동·목록 클릭 선택·장 전환·Layout↔PFD 전환; 실제 PFD가 Layout으로 잘못 분류되지 않는지 |
-| `packages.js`, `example.js` | 패키지 생성·보기·설비 이동·다시 묶기, 손으로 그린 흐름도, 예시 프로젝트 가져오기 |
+| `packages.js`, `example.js`, `areapkg.js` | Area별 패키지 생성·보기·설비 이동, 손으로 그린 흐름도, 예시 프로젝트 가져오기, 예시의 Area 패키지 이름 |
+| `lay3d.js` | 3D Layout: 설비 블록·외곽선·Area 색, 클릭 선택·더블클릭 목록 이동·목록 클릭 시 3D 이동, 돌리기·확대·위에서·맞춤, 3D↔도면 전환 (headless는 `--use-gl=swiftshader`) |
 | `costs.js` | 설비비 목록 인식·Tag/이름/Claude/수동 매칭·직접 입력·Excel 대조 |
 | `estimate.js` | 공사물량·단가·지수 → 산출(같은 PFD면 실적 그대로, 용량 ×2면 ×2^n)·직접 수정·저장 |
 | `noscope.js` | 도면 번호 없는 시트: 파일·쪽으로 찾기, 메인 흐름 대체, 오류 문구 |
@@ -130,7 +130,8 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 - 도면 번호는 `…-PFD-…`/`…-PID-…` 형식만 읽는다(다른 형식은 파일·쪽으로 대신 찾음). 스캔 PDF는 읽지 못한다(OCR 없음, PRD F13).
 - 설비 연결은 Claude가 도면 이미지로 추정한다. 도면의 선(벡터)을 직접 읽지 않는다.
 - PDF는 브라우저 메모리에 통째로 올려 읽는다. 크기 제한은 없지만 20MB가 넘는 파일은 경고를 띄우고(`BIG_FILE`), 아주 큰 파일은 탭이 멈출 수 있어 장 단위로 나눠 올리도록 안내한다.
-- Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다.
+- Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다. 3D 높이는 설비 종류별 추정값(도면 단면·EL 미판독)이고, 외곽선은 Tag를 둘러싼 가장 작은 닫힌 도형이라 건물 벽·그리드와 겹치면 틀릴 수 있다.
+- 패키지는 Area 단위라 한 Area 안의 여러 패키지(예: 보일러 패키지와 수처리 패키지)는 나누지 않는다. 예전 Claude 패키지로 저장된 실적은 다시 저장하기 전까지 투자비 학습에 예전 패키지 이름이 쓰인다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
 
