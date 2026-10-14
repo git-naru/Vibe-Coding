@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  skill:
+    name: Skill scripts and demo viewer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile scripts
+        run: python -m py_compile .claude/skills/pfd-flow-viewer/scripts/*.py apps/pfd-flow-viewer/*.py
+      - name: Extractor CLI loads
+        run: python .claude/skills/pfd-flow-viewer/scripts/pfd_extract.py --help > /dev/null
+      - name: Build demo viewer (strict, mass balance checks)
+        run: python .claude/skills/pfd-flow-viewer/scripts/build_viewer.py --strict .claude/skills/pfd-flow-viewer/examples/demo-steam.json "$RUNNER_TEMP/demo.html"
+
+  app:
+    name: HTML app build and syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build app and inline demo data
+        run: python apps/pfd-flow-viewer/check_build.py "$RUNNER_TEMP/app"
+      - name: Syntax-check page script
+        run: node --check "$RUNNER_TEMP/app/app.js"

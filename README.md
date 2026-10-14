@@ -45,3 +45,10 @@ python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html   # 예시 데이�
 ```
 
 게시 시 capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}`
+
+## CI
+
+`.github/workflows/ci.yml` — PR과 `main` push마다 GitHub Actions가 돌립니다.
+
+- 스킬: 스크립트 컴파일, 추출 CLI 로드, 가상 예제 뷰어 `--strict` 빌드(물질수지 검사 포함)
+- HTML 앱: 빌드 후 예시 데이터 삽입 확인(`apps/pfd-flow-viewer/check_build.py`), 페이지 스크립트 `node --check` 문법 검사
