@@ -438,14 +438,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <div class="eqstage"><h2>Layout · GA</h2><span class="muted" id="lay-st"></span></div>
         <div class="eqtools">
           <select id="lay-sheet" aria-label="Layout 도면 고르기"></select>
-          <div class="seg" role="group" aria-label="보기 방식" id="lay-view"><button type="button" data-v="2d" aria-pressed="true">2D 도면</button><button type="button" data-v="3d" aria-pressed="false">3D</button></div>
-          <div class="seg" role="group" aria-label="확대" id="lay-zoom"><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
+          <div class="seg" role="group" aria-label="보기 방식" id="lay-view"><button type="button" data-v="3d" aria-pressed="true">3D</button><button type="button" data-v="2d" aria-pressed="false">2D 도면</button></div>
+          <div class="seg" role="group" aria-label="확대" id="lay-zoom" hidden><button type="button" data-z="-" aria-label="축소">−</button><button type="button" data-z="fit">맞춤</button><button type="button" data-z="+" aria-label="확대">+</button></div>
         </div>
       </div>
-      <div class="laywrap" id="lay-wrap"><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
-      <div class="lay3d" id="lay-3d" hidden><canvas id="lay-cv" role="img" aria-label="Layout 3D 보기: 끌어서 돌리기, 휠로 확대, 오른쪽 버튼으로 이동"></canvas><div class="laytip" id="lay-tip" hidden></div><div class="muted laywait" id="lay-3d-wait" hidden></div></div>
+      <div class="laywrap" id="lay-wrap" hidden><div class="laystage" id="lay-stage"><img id="lay-img" alt=""><div id="lay-marks"></div></div><div class="muted laywait" id="lay-wait" hidden>도면을 그리는 중…</div></div>
+      <div class="lay3d" id="lay-3d"><canvas id="lay-cv" role="img" aria-label="Layout 3D 보기: 끌어서 돌리기, 휠로 확대, 오른쪽 버튼으로 이동"></canvas><div class="laytip" id="lay-tip" hidden></div><div class="muted laywait" id="lay-3d-wait" hidden></div></div>
       <div class="layinfo" id="lay-info" aria-live="polite"></div>
-      <p class="muted" id="lay-3d-note" hidden style="margin:0"></p>
+      <p class="muted" id="lay-3d-note" style="margin:0"></p>
       <p class="muted" style="margin:0">Layout·GA 도면 글자에서 찾은 설비 Tag를 PFD·P&amp;ID로 만든 Equipment List와 맞춰 표시합니다. 파란 상자는 목록에 있는 설비, 회색 점선은 목록에 없는 Tag입니다. 상자를 누르면 선택되고, 두 번 누르면 Equipment List의 그 설비로 이동합니다. 목록에서 행을 누르면 Layout에서 그 설비가 선택됩니다.</p>
     </section>
 
@@ -2574,7 +2574,7 @@ async function pageImage(sh, maxW, maxScale = 4) {   // one PDF page as a JPEG d
 const LAY_TITLE = /GENERAL\s+ARRANGEMENT|PLOT\s+PLAN|LAY-?OUT|EQUIPMENT\s+ARRANGEMENT|ARRANGEMENT\s+(?:PLAN|DRAWING)|배치도/i;
 const LAY_FILE = /lay-?out|plot.?plan|general.?arr|(?:^|[^a-z])ga(?:[^a-z]|$)|배치/i;
 const LAY_NOT = /PROCESS\s+FLOW\s+DIAGRAM|PIPING\s+(?:AND|&)\s+INSTRUMENT|\bP\s*&\s*ID\b|MASS\s+BALANCE|STREAM\s+TABLE/i;
-const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve(), view: '2d'};
+const LAY = {sel: null, sheet: 0, z: 1, img: new Map(), idx: null, shown: '', marks: '', pending: Promise.resolve(), view: '3d'};   // the card opens in 3D; "2D 도면" shows the drawing with its tag marks
 function isLayoutSheet(sh, fileName) {
   if (sh.dwg || sh.title) return false;
   const block = sh.items.filter(it => it.y0 > 0.7 && it.x0 > 0.5).map(it => it.s).join(' ');
