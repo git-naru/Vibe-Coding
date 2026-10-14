@@ -117,3 +117,21 @@ All text is shown as-is (escaped). Numbers are **strings copied exactly from the
 | Gas streams (Nm³/h), utilities with odd units | `rows` + `kpi` |
 
 When a table has only one "Nominal" block (no average/max/min split), use `nm`/`nv`.
+
+## Tab bundle (HTML app)
+
+A result with several systems is a bundle of flows; the main stream (feed → product) is the first tab.
+The HTML app saves, downloads and opens this shape; a plain flow JSON opens as a one-tab bundle.
+
+```jsonc
+{"kind": "bundle", "title": "염수 → 탄산리튬", "active": 0,
+ "tabs": [
+   {"key": "main",  "label": "Main Stream", "main": true,  "flow": { /* flow JSON as above, meta.main = true */ }},
+   {"key": "steam", "label": "스팀·응축수",  "main": false, "flow": { /* another flow */ }}
+ ]}
+```
+
+A flow may also be given as topology only — `nodes` without coordinates plus
+`"edges": [{"id": "422", "from": "4300-RX-008", "to": "4400-TK-073"}]` and no `lines` — and the app
+lays it out (dagre) the first time it opens. `links` (same shape as `edges`) keeps the equipment tags at
+each stream's ends so the equipment list can pick up stream values.
