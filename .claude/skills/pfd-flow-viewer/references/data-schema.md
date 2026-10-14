@@ -175,5 +175,19 @@ The record's `equipment` may carry `cost`: the matched equipment costs.
          "edits": {"6300-PU-024": 7700}}        // costs typed into the table, by normalised tag
 ```
 
+Projects carry `role`: `"record"` (실적, the default) or `"estimate"` (투자비 산출). A record's JSON may also carry
+`qty` (construction quantities of a recorded project) and `est` (choices made on an estimate):
+
+```jsonc
+"qty": {"file": "qty.xlsx", "items": [{"target": "6300-PU-002~004", "work": "배관", "qty": 90, "unit": "m"},
+                                      {"target": "공통", "work": "토목", "qty": 500, "unit": "m³"}]},
+"est": {"refs": null,                          // record project ids to learn from (null = all)
+        "caps": {"6300-BO-005": {"v": 14.7, "u": "t/h"}}, "methods": {"6300-PU-002": "unit"},
+        "over": {"6300-DA-001": 99000}, "qover": {"토목": 650}}
+```
+
+The viewer's company construction rates and estimating basis are one document, `settings-rates`:
+`{"kind": "rates", "items": [{"work": "배관", "unit": "m", "rate": 150}], "currency": "USD", "exps": {"펌프": 0.52, "_기본": 0.6}, "qexp": 0.7}`.
+
 A record's JSON is split over part documents so a large main stream stays under the store's 256 KiB per-document limit;
 the record document itself stays small so a project's records list quickly.
