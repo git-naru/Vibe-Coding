@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pfdcore"
+version = "0.1.0"
+description = "PFD 공정 실적·투자비 앱의 핵심 로직 (PDF 판독, Equipment List, 설비비 매칭, 투자비 산출)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pdfminer.six==20260107",   # PDF parsing and fonts; pinned: font/CMap handling changes would change text items
+  "openpyxl>=3.1",            # writing the Excel downloads
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+pfdcore = "pfdcore.__main__:main"
+
+[tool.setuptools]
+packages = ["pfdcore"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
