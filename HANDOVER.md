@@ -42,7 +42,7 @@ apps/pfd-flow-viewer/
   build.py                    단일 HTML 빌드: 예제 삽입, --sample 로 비공개 예시 삽입
   check_build.py              CI 검사: 자리표시 치환, sample-data가 null인지, 스크립트 추출
 core/
-  pfdcore/                    Python 패키지: pdf, sheets, streams, equipment, cost, estimate, export, xlsx·ssf(SheetJS 읽기), js(JavaScript 동작)
+  pfdcore/                    Python 패키지: pdf, sheets, streams, equipment, layout, cost, estimate, export, xlsx·ssf(SheetJS 읽기), js(JavaScript 동작)
   tests/                      앱 코드와 대조하는 테스트, 가상 입력 생성(fixtures.py), 실제 도면 대조 스크립트(compare_app.py)
   tests/parity/               harness.cjs: app.html 페이지 스크립트를 Node에서 실행 (pdf.js 3.11.174, SheetJS 0.18.5)
 .github/workflows/ci.yml

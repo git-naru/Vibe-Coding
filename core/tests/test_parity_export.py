@@ -67,3 +67,21 @@ estCompute(); await downloadEstimate(); return globalThis.__dl;""")
     a, p = cells(base64.b64decode(app["data"])), cells(saved(py))
     assert list(a) == list(p) == ["요약", "설비비", "공사비", "공사물량 근거", "산출 기준"]
     assert_same(a, p, "estimate workbook")
+
+
+def test_equipment_download_with_layouts(work):
+    import fixtures
+    from pfdcore import layout
+    d = work["dir"]
+    shs = pdf.read_pdf(work["pdf"]) + pdf.read_pdf(fixtures.layout_pdf(d / "ga.pdf"), file_id=2)
+    proc, lays = layout.split_sheets(shs)
+    rows = equipment.build_equipment(proc)
+    app = run_app(CAPTURE + f"""
+Object.assign(EQ, {{rows: {json.dumps(rows['rows'])}, refsMissing: {json.dumps(rows['refsMissing'])}, areaNames: {json.dumps(rows['areaNames'])}, cost: null, mbTitle: '', sample: null}});
+EQ.costCalc = null; S.layouts = {json.dumps(lays)};
+S.files = [{{kind: 'pdf', ok: true, file: {{name: 'pfd.pdf'}}, pages: 3}}]; S.sheets = [{{}}, {{}}, {{}}];
+await downloadEquipment(); return globalThis.__dl;""")
+    py = export.equipment_workbook(rows["rows"], rows["refsMissing"], rows["areaNames"], inputs="pfd.pdf (3장)", vision="0/3장 실행", layouts=lays)
+    a, p = cells(base64.b64decode(app["data"])), cells(saved(py))
+    assert "Layout 위치" in a["Equipment List"][0]
+    assert_same(a, p, "Equipment List workbook with Layout")

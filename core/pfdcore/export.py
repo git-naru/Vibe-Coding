@@ -12,6 +12,7 @@ from . import js
 from .cost import HOW, eq_key
 from .equipment import row_flags
 from .estimate import fmt_cap
+from .layout import layout_at, layout_index
 
 
 def ko_now(now=None):
@@ -41,9 +42,9 @@ def _sheet(wb, name, aoa, widths=None, autofilter=False):
     return ws
 
 
-def equipment_workbook(rows, refs_missing, area_names, cost=None, costs=None, mb_title="", inputs="", vision="", now=None):
+def equipment_workbook(rows, refs_missing, area_names, cost=None, costs=None, mb_title="", inputs="", vision="", now=None, layouts=None):
     """The Equipment List workbook. cost = the record's cost state, costs = compute_costs(cost, rows);
-    inputs = the '입력' line (e.g. "a.pdf (3장)"), vision = "1/3장 실행"."""
+    inputs = the '입력' line (e.g. "a.pdf (3장)"), vision = "1/3장 실행"; layouts = the Layout/GA sheets read."""
     mb = any(r.get("mb") for r in rows)
     K, C = costs, cost
     cu = f" ({C['unit']})" if C and C.get("unit") else ""
@@ -63,13 +64,14 @@ def equipment_workbook(rows, refs_missing, area_names, cost=None, costs=None, mb
     head = ["No.", "Area", "Tag No.", "Equipment Name (도면 원문)", "종류", "운전 구분", *([f"설비비{cu}", "설비비 매칭", "설비비 목록 행"] if K else []),
             "비고 (도면 표기)", "Nom. Vol. (m³)", "PFD 도면 번호", "PDF 파일", "PDF 쪽", "도면 구역 (행-열)",
             *(["값 출처 탭", "입구 Stream", "출구 Stream", "기준 Stream", "유체", "일 유량 (t/d)", "Nominal 평균 (t/h)", "Design 최대 (t/h)", "운전 온도 (°C)", "운전 압력 (bar)", "밀도 (t/m³)", "고형분 (%)"] if mb else []),
-            "확인 필요"]
+            *(["Layout 위치"] if layouts else []), "확인 필요"]
+    LX = layout_index(rows, layouts) if layouts else None
     aoa = [head]
     for i, r in enumerate(rows):
         m = r.get("mb")
         aoa.append([i + 1, r["area"], r["tag"], r["name"], r["kind"], r["status"], *cost_cols(r), r["note"], r["vol"], r["dwg"], r["file"], r["page"], r["zone"],
                     *(([m["tab"], m["in"], m["out"], m["basis"], m["fluid"], m["dm"], m["nm"], m["dx"], m["T"], m["P"], m["rho"], m["sol"]] if m else [""] * 12) if mb else []),
-                    row_flags(r)])
+                    *([layout_at(LX, r)] if LX else []), row_flags(r)])
 
     def wch(h):
         return 44 if js.test("Name", h) else 32 if js.test("도면 번호|확인", h) else 22 if js.test("파일|유체", h) else max(8, min(16, js.length(h) + 2))

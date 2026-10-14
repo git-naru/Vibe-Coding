@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import cost, equipment, estimate, export, js, pdf, sheets, xlsx
+from . import cost, equipment, estimate, export, js, layout, pdf, sheets, xlsx
 
 
 def _json(path, value):
@@ -21,8 +21,10 @@ def _json(path, value):
 
 def cmd_equipment(a):
     shs = []
-    for i, f in enumerate(a.pdfs):
+    for i, f in enumerate(a.pdfs + a.layout + a.pfd):
         shs.extend(pdf.read_pdf(f, file_id=i + 1, cmap_fonts="read" if a.cmaps else "app"))
+    roles = {**{Path(f).name: "layout" for f in a.layout}, **{Path(f).name: "pfd" for f in a.pfd}}
+    shs, lays = layout.split_sheets(shs, roles)
     eq = equipment.build_equipment(shs)
     title = ""
     if a.bundle:
@@ -39,6 +41,10 @@ def cmd_equipment(a):
     rows = eq["rows"]
     u = sum(1 for r in rows if r.get("untagged"))
     print(f"설비 {len(rows)}건 (Tag 있음 {len(rows) - u}, 미확인 {u}) · PFD {len(shs)}장 · 도면 미포함 참조 {len(eq['refsMissing'])}건")
+    if lays:
+        LX = layout.layout_index(rows, lays)
+        found = sum(1 for k in LX["rowsOf"] if k in LX["where"])
+        print(f"Layout {len(lays)}장 · Equipment List Tag {len(LX['rowsOf'])}개 중 {found}개 위치 찾음")
     for w in sorted({w for s in shs for w in s["warnings"]}):
         print("주의:", {"cmap-font": "CMap 파일이 필요한 글꼴의 글자는 앱처럼 읽지 않았습니다 (--cmaps로 읽기)", "vertical": "세로쓰기 글자", "rtl": "오른쪽에서 왼쪽 글자"}.get(w, w))
     if K:
@@ -48,10 +54,10 @@ def cmd_equipment(a):
                        "sheets": len(shs), "cost": C})
     if a.xlsx:
         files = {}
-        for s in shs:
+        for s in shs + lays:
             files[s["file"]] = files.get(s["file"], 0) + 1
         export.equipment_workbook(rows, eq["refsMissing"], eq["areaNames"], cost=C, costs=K, mb_title=title,
-                                  inputs=", ".join(f"{n} ({k}장)" for n, k in files.items()), vision=f"0/{len(shs)}장 실행").save(a.xlsx)
+                                  inputs=", ".join(f"{n} ({k}장)" for n, k in files.items()), vision=f"0/{len(shs)}장 실행", layouts=lays).save(a.xlsx)
         print("Excel:", a.xlsx)
     return 0
 
@@ -93,7 +99,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="pfdcore", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("equipment", help="PFD PDFs → Equipment List")
-    e.add_argument("pdfs", nargs="+")
+    e.add_argument("pdfs", nargs="*")
+    e.add_argument("--layout", action="append", default=[], help="a PDF whose sheets are Layout/GA drawings (else decided per sheet)")
+    e.add_argument("--pfd", action="append", default=[], help="a PDF whose sheets are process sheets even if they look like Layout")
     e.add_argument("--cost", help="manual equipment list with costs (.xlsx/.csv)")
     e.add_argument("--bundle", help="flow or tab bundle JSON (stream values for the equipment)")
     e.add_argument("--cmaps", action="store_true", help="also read fonts the app cannot (pdf.js without CMap files)")

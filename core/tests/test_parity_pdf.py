@@ -7,7 +7,7 @@ from conftest import assert_same, jsq, run_app
 from pfdcore import equipment, pdf, sheets
 
 SHEET_KEYS = ["key", "fileId", "file", "page", "dwg", "aliases", "title", "connectors", "badges", "items", "imgs",
-              "textLayer", "textTable", "rotate", "grid", "area", "eq"]
+              "textLayer", "textTable", "rotate", "grid", "area", "eq", "layTitle"]
 
 
 @pytest.fixture(scope="module")
@@ -94,3 +94,45 @@ def test_fonts_needing_cmap_files(tmp_path, mode):
     korean = [it["s"] for it in py[0]["items"] if any(ord(c) > 0x3000 for c in it["s"])]
     assert korean == ([] if mode == "app" else ["급수탱크", "보일러"])
     assert py[0]["warnings"] == (["cmap-font"] if mode == "app" else [])
+
+
+@pytest.fixture(scope="module")
+def layout_files(work):
+    import fixtures
+    d = work["dir"]
+    return [str(work["pdf"]), str(fixtures.layout_pdf(d / "unit-1000-ga.pdf")), str(fixtures.layout_pdf(d / "plant-layout.pdf", title=False))]
+
+
+def _read_all(files, roles=None):
+    from pfdcore import layout
+    shs = []
+    for i, f in enumerate(files):
+        shs.extend(pdf.read_pdf(f, file_id=i + 1))
+    return layout.split_sheets(shs, roles)
+
+
+@pytest.mark.parametrize("switch", [None, 1, 2])
+def test_layout_sheets(layout_files, switch):
+    """Layout/GA sheets go beside the list; their tags point at its rows. switch = the file the viewer flips."""
+    from pfdcore import layout
+    app = run_app(f"""
+const files = {json.dumps(layout_files)};
+for (let i = 0; i < files.length; i++) {{ const e = fileEntry(files[i], i + 1); S.files.push(e); await readPdf(e); e.status = '완료'; }}
+buildEquipment();
+{f"setFileRole({switch});" if switch else ""}
+const LX = layoutIndex();
+return {{sheets: S.sheets.map(s => s.key), layouts: S.layouts.map(s => ({{key: s.key, layTitle: s.layTitle}})), rows: EQ.rows,
+        idx: {{sheets: LX.sheets.map(L => ({{key: L.sh.key, marks: L.marks}})), rowsOf: LX.rowsOf, where: LX.where}},
+        at: EQ.rows.map(r => {{ const w = !r.untagged && LX.where.get(normTag(r.tag)); return w ? w.map(j => layoutLabel(LX.sheets[j].sh)).join(', ') : ''; }})}};""")
+    names = {1: "pfd.pdf", 2: "unit-1000-ga.pdf"}
+    roles = {names[switch]: "pfd" if switch == 2 else "layout"} if switch else None
+    proc, lays = _read_all(layout_files, roles)
+    eq = equipment.build_equipment(proc)
+    LX = layout.layout_index(eq["rows"], lays)
+    py = {"sheets": [s["key"] for s in proc], "layouts": [{"key": s["key"], "layTitle": s["layTitle"]} for s in lays], "rows": eq["rows"],
+          "idx": {"sheets": [{"key": L["sh"]["key"], "marks": L["marks"]} for L in LX["sheets"]], "rowsOf": LX["rowsOf"], "where": LX["where"]},
+          "at": [layout.layout_at(LX, r) for r in eq["rows"]]}
+    assert_same(app, py, f"Layout sheets (switch {switch})")
+    if switch is None:
+        assert [s["key"] for s in lays] == ["unit-1000-ga.pdf p1", "plant-layout.pdf p1"]
+        assert {m["how"] for L in LX["sheets"] for m in L["marks"]} == {"tag", "short"}

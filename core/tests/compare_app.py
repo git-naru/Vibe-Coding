@@ -20,7 +20,7 @@ sys.path.insert(0, str(HERE.parent))
 
 from conftest import _clean, diff, run_app  # noqa: E402
 
-from pfdcore import cost, equipment, pdf, sheets, xlsx  # noqa: E402
+from pfdcore import cost, equipment, layout, pdf, sheets, xlsx  # noqa: E402
 
 
 def main():
@@ -37,7 +37,9 @@ def main():
 const files = {json.dumps(files)};
 for (let i = 0; i < files.length; i++) {{ const e = fileEntry(files[i], i + 1); e.ok = true; S.files.push(e); await readPdf(e); }}
 const links = buildLinks(S.sheets); buildEquipment();
-const out = {{sheets: S.sheets.map(s => ({{key: s.key, items: s.items, imgs: s.imgs, dwg: s.dwg, title: s.title}})),
+const LX = S.layouts.length ? layoutIndex() : null;
+const out = {{sheets: [...S.sheets, ...S.layouts].map(s => ({{key: s.key, items: s.items, imgs: s.imgs, dwg: s.dwg, title: s.title}})),
+  layouts: S.layouts.map(s => s.key), lay: LX && {{marks: LX.sheets.map(L => L.marks), where: LX.where}},
   links: {{flows: links.flows, missing: links.missing, matched: links.matched, issues: links.issues, missingCount: links.missingCount}},
   eq: {{rows: EQ.rows, refsMissing: EQ.refsMissing, areaNames: EQ.areaNames}}}};
 {f"const l = parseCostWorkbook(workbook({json.dumps(str(Path(a.cost).resolve()))})); out.cost = computeCosts({{list: l, unit: l ? l.unit : '', edits: {{}}, pick: {{}}, ai: {{}}}}, EQ.rows);" if a.cost else ""}
@@ -48,13 +50,18 @@ return out;""", timeout=3600)
     shs = []
     for i, f in enumerate(files):
         shs.extend(pdf.read_pdf(f, file_id=i + 1, cmap_fonts="read" if a.cmaps else "app"))
+    shs, lays = layout.split_sheets(shs)
     links = sheets.build_links(shs)
     eq = equipment.build_equipment(shs)
+    LX = layout.layout_index(eq["rows"], lays) if lays else None
+    lay = LX and {"marks": [L["marks"] for L in LX["sheets"]], "where": LX["where"]}
     t_py = time.time() - t
 
     bad = 0
-    print(f"app {t_app:.1f}s (incl. Node start) · pfdcore {t_py:.1f}s · sheets app {len(app['sheets'])} / pfdcore {len(shs)}")
-    for s_app, s_py in zip(app["sheets"], shs):
+    print(f"app {t_app:.1f}s (incl. Node start) · pfdcore {t_py:.1f}s · sheets app {len(app['sheets'])} / pfdcore {len(shs) + len(lays)}")
+    print(f"  Layout/GA sheets: app {app['layouts']} / pfdcore {[s['key'] for s in lays]}")
+    bad += app["layouts"] != [s["key"] for s in lays]
+    for s_app, s_py in zip(app["sheets"], shs + lays):
         d = diff(_clean(s_app["items"]), _clean(s_py["items"]))
         flag = "OK " if not d else "DIFF"
         bad += bool(d)
@@ -62,7 +69,7 @@ return out;""", timeout=3600)
               + (f", warnings {s_py['warnings']}" if s_py["warnings"] else "") + (f", {len(d)} differences" if d else ""))
         for x in d[:a.show]:
             print("       ", x)
-    for name, x, y in [("sheet links", app["links"], links), ("Equipment List", app["eq"], eq)]:
+    for name, x, y in [("sheet links", app["links"], links), ("Equipment List", app["eq"], eq), ("Layout tags", app["lay"], lay)]:
         d = diff(_clean(x), _clean(y))
         bad += bool(d)
         print(f"  {'OK ' if not d else 'DIFF'} {name}" + (f": {len(d)} differences" if d else f" ({len(eq['rows'])} rows)" if name == "Equipment List" else ""))

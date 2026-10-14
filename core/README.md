@@ -13,7 +13,7 @@ python -m pytest core/tests
 ## 쓰기
 
 ```bash
-pfdcore equipment A.pdf B.pdf --cost 설비비.xlsx --xlsx equipment-list.xlsx --json equipment.json
+pfdcore equipment A.pdf B.pdf --cost 설비비.xlsx --xlsx equipment-list.xlsx --json equipment.json   # --layout GA.pdf / --pfd X.pdf 로 파일 역할 지정
 pfdcore estimate --rows 산출.json --record "실적 A=a.json" --record "실적 B=b.json" --rates 단가.xlsx --xlsx estimate.xlsx
 ```
 
@@ -36,6 +36,7 @@ K = pfdcore.compute_costs(C, eq["rows"])                 # 설비별 설비비, 
 | `sheets` | 1 | 도면 번호, 시트 식별, 시트 밖 연결, 시트 간 연결 대조 |
 | `streams` | 2 | Stream Table (텍스트 레이어·XLSX) → 뷰어 항목 |
 | `equipment` | 10 | 설비 판별, Equipment List, 흐름도 Stream 값 연결, 그림 판독 결과 합치기 |
+| `layout` | 10 뒤 Layout | Layout·GA 도면 가려내기(파일별 전환 포함), 도면 위 Tag → Equipment List 행 연결 |
 | `cost` | 11 | 설비비 목록 읽기, Tag·이름·Claude·수동 매칭, 직접 입력 |
 | `estimate` | 12 | 공사물량·단가 읽기, 실적 학습, 설비비(용량지수·실적 단가)·공사비 산출 |
 | `export` | 10·12 내려받기 | Equipment List·투자비 근거 Excel (시트·칸 동일) |
@@ -44,7 +45,7 @@ K = pfdcore.compute_costs(C, eq["rows"])                 # 설비별 설비비, 
 
 ## 같은 결과 확인
 
-`tests/parity/harness.cjs`가 `app.html`의 페이지 스크립트를 Node에서 그대로 실행한다(화면은 가짜, pdf.js·SheetJS는 앱과 같은 버전). 테스트는 같은 가상 입력(`tests/fixtures.py`: 가짜 PFD PDF, 설비비·물량·단가 Excel)을 앱 코드와 pfdcore에 넣고 결과 JSON을 비교한다. 소수는 상대 오차 1e-12까지 같다고 본다(`Math.pow`·`Math.log` 마지막 자리 차이). 대조 대상: 글자 항목·이미지 영역, 시트 기록, 시트 연결, Equipment List, Stream 값 연결, 설비비 목록·매칭(5가지 경우), Claude 매칭 검증, 공사물량·단가 읽기, 산출(5가지 경우), Excel 두 가지(모든 칸), SheetJS 읽기(21개 표시 형식 × 23개 값, CSV).
+`tests/parity/harness.cjs`가 `app.html`의 페이지 스크립트를 Node에서 그대로 실행한다(화면은 가짜, pdf.js·SheetJS는 앱과 같은 버전). 테스트는 같은 가상 입력(`tests/fixtures.py`: 가짜 PFD PDF, 설비비·물량·단가 Excel)을 앱 코드와 pfdcore에 넣고 결과 JSON을 비교한다. 소수는 상대 오차 1e-12까지 같다고 본다(`Math.pow`·`Math.log` 마지막 자리 차이). 대조 대상: 글자 항목·이미지 영역, 시트 기록, 시트 연결, Equipment List, Stream 값 연결, Layout·GA 도면 가려내기와 Tag 위치, 설비비 목록·매칭(5가지 경우), Claude 매칭 검증, 공사물량·단가 읽기, 산출(5가지 경우), Excel 두 가지(모든 칸), SheetJS 읽기(21개 표시 형식 × 23개 값, CSV).
 
 실제 도면은 저장소에 넣지 않으므로 비공개 자료로 따로 대조한다.
 

@@ -6,6 +6,7 @@ Excel downloads. Data shapes are the app's record shapes (data-schema.md), so re
 """
 from .cost import compute_costs, eq_key, expand_tags, load_cost_list, norm_tag, parse_cost_workbook
 from .equipment import build_equipment, extract_equipment, link_equipment_to_flow
+from .layout import is_layout_sheet, layout_index, split_sheets
 from .estimate import default_rates, est_compute, learn_from, load_rates, new_est, read_qty, read_rates
 from .pdf import read_pdf
 from .sheets import build_links
@@ -16,4 +17,4 @@ APP_VERSIONS = {"pdf.js": "3.11.174", "SheetJS": "0.18.5"}   # the libraries who
 
 __all__ = ["read_pdf", "build_links", "build_equipment", "extract_equipment", "link_equipment_to_flow", "read_workbook",
            "parse_cost_workbook", "load_cost_list", "compute_costs", "eq_key", "norm_tag", "expand_tags",
-           "read_qty", "read_rates", "default_rates", "load_rates", "learn_from", "new_est", "est_compute"]
+           "split_sheets", "is_layout_sheet", "layout_index", "read_qty", "read_rates", "default_rates", "load_rates", "learn_from", "new_est", "est_compute"]

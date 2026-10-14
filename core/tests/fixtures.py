@@ -298,3 +298,28 @@ def cjk_pdf(path):
     root = w.add(f"<< /Type /Catalog /Pages {pages_id} 0 R >>")
     w.save(path, root)
     return path
+
+
+def layout_pdf(path, title=True):
+    """A made-up equipment arrangement drawing: tags written in full, as ranges, short ('PU-007' without the area),
+    off the list, and in the title block. With title=False only the file name says it is a Layout."""
+    w = PdfWriter()
+    fonts = _fonts(w)
+    W, H = A3
+    p = Page(W, H)
+    for fx, fy, s in [(0.20, 0.20, "1000-TK-001"), (0.30, 0.22, "1000-PU-001/002"), (0.40, 0.25, "PU-007"), (0.45, 0.25, "TK-004"),
+                      (0.50, 0.30, "2000-IX-002~004"), (0.55, 0.35, "3000-PU-099"), (0.60, 0.40, "4000-ZZ-001"), (0.62, 0.45, "HX-003 / FL-005"),
+                      (0.25, 0.50, "BRINE FEED TANK"), (0.70, 0.86, "5000-TK-001"), (0.30, 0.60, "PU-001")]:
+        p.at(fx, fy, s)
+    if title:
+        p.at(0.80, 0.885, "GENERAL ARRANGEMENT", font="F4", size=8)
+        p.at(0.80, 0.905, "FEED AREA PLOT", size=7)
+    else:
+        p.at(0.80, 0.885, "AREA 1000", size=8)
+    c = w.stream(p.data())
+    pid = len(w.objs) + 2
+    pg = w.add(f"<< /Type /Page /Parent {pid} 0 R /MediaBox [0 0 {W:.2f} {H:.2f}] /Contents {c} 0 R /Resources << /Font << {fonts} >> >> >>")
+    w.add(f"<< /Type /Pages /Kids [{pg} 0 R] /Count 1 >>")
+    root = w.add(f"<< /Type /Catalog /Pages {pid} 0 R >>")
+    w.save(path, root)
+    return path

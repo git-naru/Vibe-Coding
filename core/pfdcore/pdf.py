@@ -26,6 +26,7 @@ from pdfminer.psparser import PSLiteral, literal_name
 
 from . import js
 from .equipment import extract_equipment, sheet_area, sheet_grid
+from .layout import lay_title
 from .sheets import connectors_of, is_badge, sheet_identity
 from .streams import parse_text_table
 
@@ -850,11 +851,13 @@ def make_sheet(items, imgs, rot, file_name, page, file_id=1):
         sh["eq"] = extract_equipment(sh)
     except Exception:   # the app keeps the sheet without equipment when the pass fails
         sh["eq"] = None
+    sh["layTitle"] = lay_title(items)
     return sh
 
 
 def read_pdf(path_or_bytes, name=None, file_id=1, cmap_fonts="app"):
     """Every page of a PDF as a sheet record (see make_sheet), plus pdf-reading warnings per sheet.
+    Process sheets and Layout/GA drawings come together; `layout.split_sheets` sorts them as the app does.
 
     cmap_fonts="app" drops the text of fonts pdf.js cannot load without its CMap files, as the app does
     (warning "cmap-font"); "read" reads them, as the app would if it gave pdf.js a cMapUrl."""
