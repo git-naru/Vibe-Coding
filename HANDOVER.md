@@ -63,12 +63,12 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 | 6 | 생성 파이프라인 | `STEP_DEFS`, `buildFlow`, `generate`, `assemble`, `layout`(구역별 줄 배치), `linksOf`, `nodeInfoOf` |
 | 7 | 뷰어 | `renderViewer`(흐름도 + 상세설명 카드), `showBundle`, `packageView`(패키지별 보기), `showView`, 탭 |
 | 8 | 프로젝트·기록 저장 | `store`(db 또는 메모리), `saveRecord`(60,000자 part 분할), `openRecord`, `loadLegacy`, `importJson` |
-| 10 | Equipment List | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `runVision`(그림 판독), `downloadEquipment` |
+| 10 | Equipment List, Layout·GA | `EQ`, `extractEquipment`, `buildEquipment`, `linkEquipmentToFlow`, `openPfd`, `pageImage`, `runVision`(그림 판독), `downloadEquipment`; Layout: `LAY`, `isLayoutSheet`, `layoutIndex`(Tag 맞춤), `renderLayout`/`drawLayout`, `layoutSelect`, `gotoRow`, `setFileRole`(파일 시트를 Layout↔PFD로) |
 | 11 | 설비비 매칭 | `normTag`, `expandTags`, `parseCostWorkbook`, `computeCosts(C, rows)`, `costOfNodes`, `costAi` |
 | 12 | 공사물량·투자비 산출 | `capOf`, `bundlePackages`, `resolveTarget`, `readQtyFile`, `RATES`/`EXP_DEFAULT`, `learnFrom`, `estEquipment`, `estQuantities`, `estCompute`, `downloadEstimate` |
 | 9 | 화면 연결(마지막) | 버튼 핸들러, `openExample`, `adoptExample`, `go`(화면 이동) |
 
-전역 상태: `S`(입력 파일·시트·결과 묶음·현재 프로젝트·기록 id), `EQ`(Equipment List·설비비 `cost`·공사물량 `qty`·산출 `est`), `P`(프로젝트·기록 목록), `RATES`(공사 단가·지수), `REF`(학습한 실적 캐시), `V`(지금 보이는 흐름도, 패키지 보기면 `.base`에 원본).
+전역 상태: `S`(입력 파일·시트(`sheets` 공정, `layouts` Layout·GA)·결과 묶음·현재 프로젝트·기록 id), `EQ`(Equipment List·설비비 `cost`·공사물량 `qty`·산출 `est`), `P`(프로젝트·기록 목록), `RATES`(공사 단가·지수), `REF`(학습한 실적 캐시), `V`(지금 보이는 흐름도, 패키지 보기면 `.base`에 원본).
 
 claude.ai capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "downloads": true}`. db는 `data/users/<id>` 아래 개인 저장(본인만 보임), 문서당 256 KiB 한도라 기록은 part 문서로 나눈다.
 
@@ -118,6 +118,7 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 | `projects.js` | 프로젝트 생성 → PDF 업로드 → 생성 → 자동 저장 → 새로고침 → 기록 다시 열기(Claude 0회) → 수정·삭제, 상세설명 프레임 스크롤 |
 | `tabs.js` | 메인 + 계통 탭, 탭 추가, 저장·다시 열기, JSON 왕복 |
 | `eqtest.js`, `vis.js` | Equipment List(진행률·10행·PFD 새 창·Excel), 그림으로 설비 찾기·중지·이어하기 |
+| `layout.js`, `laycls.js` | Layout 카드 위치·Tag 맞춤(약식 Tag·목록에 없는 Tag)·선택·더블클릭 목록 이동·목록 클릭 선택·장 전환·Layout↔PFD 전환; 실제 PFD가 Layout으로 잘못 분류되지 않는지 |
 | `packages.js`, `example.js` | 패키지 생성·보기·설비 이동·다시 묶기, 손으로 그린 흐름도, 예시 프로젝트 가져오기 |
 | `costs.js` | 설비비 목록 인식·Tag/이름/Claude/수동 매칭·직접 입력·Excel 대조 |
 | `estimate.js` | 공사물량·단가·지수 → 산출(같은 PFD면 실적 그대로, 용량 ×2면 ×2^n)·직접 수정·저장 |
@@ -129,6 +130,7 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 - 도면 번호는 `…-PFD-…`/`…-PID-…` 형식만 읽는다(다른 형식은 파일·쪽으로 대신 찾음). 스캔 PDF는 읽지 못한다(OCR 없음, PRD F13).
 - 설비 연결은 Claude가 도면 이미지로 추정한다. 도면의 선(벡터)을 직접 읽지 않는다.
 - PDF는 브라우저 메모리에 통째로 올려 읽는다. 크기 제한은 없지만 20MB가 넘는 파일은 경고를 띄우고(`BIG_FILE`), 아주 큰 파일은 탭이 멈출 수 있어 장 단위로 나눠 올리도록 안내한다.
+- Layout·GA 도면은 글자 Tag 위치로만 맞춘다(그림만 있는 설비, 스캔본은 못 찾음). 도면 그림은 기록에 저장하지 않는다.
 - 저장은 claude.ai 개인 저장소라 팀 공유·백업이 없고 원본 PDF를 보관하지 않는다.
 - 투자비: 지수 기본값은 일반 문헌의 대략값. 물가·지역 보정, 통화 환산, 간접비·예비비 없음. 실적의 설비비·물량이 일부만 있으면 물량이 크게 잡힐 수 있다. 실제 실적으로 검증하지 않았다.
 
