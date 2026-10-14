@@ -34,6 +34,10 @@ python3 scripts/build_viewer.py examples/demo-steam.json /tmp/demo.html
 - 브라우저: 파일 읽기(pdf.js, SheetJS, mammoth), 시트 식별·시트 간 연결, 텍스트·엑셀 표 값 채우기, 물질수지 검증, 자동 배치(dagre).
 - Claude(`sample` capability): 계통 범위 판단 1회, 시트별 연결 해석(도면 이미지 + 글자 위치), 표가 이미지인 시트의 표 판독. 판독값은 "이미지 판독값"으로 표시됩니다.
 - 결과는 개인 저장 목록(`db`, 본인만 보임)에 저장하거나 JSON으로 내려받고, 다시 열 때는 Claude를 부르지 않습니다.
+- Equipment List: PDF를 올리면 Claude 없이 자동으로 만듭니다(원형 진행률 0~100%). 설비 이름 아래 단독으로 적힌 Tag를 설비로 보고, 호기 번호 분리·예비/향후 구분·도면 구역(테두리 격자 행-열)을 붙입니다. Tag 없이 이름만 있는 설비는 "미확인" 후보로 넣습니다.
+  - 표는 10행 높이로 스크롤되고, 행을 더블클릭(또는 Enter)하면 해당 PFD 쪽을 새 창에 열어 위치를 빨간 상자로 표시합니다(새 창이 막히면 화면 안 보기).
+  - 흐름도를 생성하거나 열면 그 계통 설비에 기준 Stream 값(유량·온도·압력)이 채워집니다.
+  - "Excel로 내려받기"는 Equipment List, Summary, 도면 미포함 설비, 작성 기준 4개 시트의 .xlsx를 만듭니다.
 
 ```bash
 python3 apps/pfd-flow-viewer/build.py /tmp/pfd-flow-app.html   # 예시 데이터를 넣어 단일 파일로 빌드
