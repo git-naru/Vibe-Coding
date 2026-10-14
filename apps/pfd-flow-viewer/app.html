@@ -1824,16 +1824,18 @@ function packageView(D) {
    into it, in both views; every other line — discards, utilities (air, N2, steam, condensate, cooling water, fuel gas),
    anything uncategorised — is left out with the boxes only those lines reach. Kept: categories main / product / recycle /
    reagent (the keys the main stream prompt asks for), or a category label that says so, unless the line reads as a
-   utility. System tabs (스팀·응축수 …) show everything, and so does a flow none of whose lines qualifies.
+   utility. System tabs (스팀·응축수 …) show everything, and so does a flow without a single main stream line.
    Derived on the fly: the flow itself keeps every line, and "모든 라인 보기" brings them back. */
-const SHOW_CAT = /^(main|feed|raw|process|product|recycle|reagent)/i, SHOW_LABEL = /메인|주\s*공정|원료|제품|재순환|모액|여액|시약|부원료|약품|첨가|main|feed|product|recycle|reagent|chemical/i;
+const MAIN_CAT = /^(main|feed|raw|process|product|recycle)/i, MAIN_LABEL = /메인|주\s*공정|원료|제품|재순환|모액|여액|main|feed|product|recycle/i;
+const REAGENT_CAT = /^reagent/i, REAGENT_LABEL = /시약|부원료|약품|첨가|reagent|chemical/i;
 const UTIL_RX = /\b(?:INSTRUMENT\s+|PLANT\s+|SERVICE\s+|COMPRESSED\s+)?AIR\b|\bN\s*[2₂]\b|NITROGEN|\bSTEAM\b|CONDENSATE|COOLING\s+WATER|CHILLED\s+WATER|\bC\.?W\.?[SR]\b|FUEL\s*GAS|\bLPG\b|공기|질소|증기|스팀|응축수|냉각수|냉수|칠러|연료\s*가스/i;
 function hiddenStreams(D) {
   const C = D.categories || {}, all = Object.entries(D.streams || {}).filter(([, x]) => !x.info);
-  const shown = ([, x]) => { const lab = (C[x.cat] || {}).label || '';
-    return (SHOW_CAT.test(x.cat || '') || SHOW_LABEL.test(lab)) && !UTIL_RX.test([x.ko, x.en, lab].join(' ')); };
-  const keep = all.filter(shown);
-  return keep.length ? new Set(all.filter(e => !shown(e)).map(([k]) => k)) : new Set();
+  const kind = ([, x]) => { const lab = (C[x.cat] || {}).label || '';
+    if (UTIL_RX.test([x.ko, x.en, lab].join(' '))) return '';
+    return MAIN_CAT.test(x.cat || '') || MAIN_LABEL.test(lab) ? 'main' : REAGENT_CAT.test(x.cat || '') || REAGENT_LABEL.test(lab) ? 'reagent' : ''; };
+  if (!all.some(e => kind(e) === 'main')) return new Set();   // no main stream line here (a utility-only upload): show it whole
+  return new Set(all.filter(e => !kind(e)).map(([k]) => k));
 }
 const isMainTab = () => { const B = S.bundle, t = B && B.tabs[B.active || 0]; return !!((t && t.main) || (S.result && (S.result.meta || {}).main)); };
 function shownFlow(D) {
