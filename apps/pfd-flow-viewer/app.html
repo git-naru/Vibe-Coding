@@ -51,7 +51,7 @@ input[type=text]{font:inherit;font-size:14px;padding:6px 10px;border:1px solid v
 .tbl td.l{text-align:left}
 .files td{vertical-align:middle}
 .files td.st{font-size:12px;color:var(--muted);text-align:left}
-.files td.st.ok{color:var(--ok)}.files td.st.bad{color:var(--bad)}
+.files td.st.ok{color:var(--ok)}.files td.st.bad{color:var(--bad)}.files td.st.warn{color:var(--warn)}
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
 .sum{background:var(--chip);border-radius:5px;padding:8px 10px;min-width:0}
 .sum .k{font-size:11.5px;color:var(--muted)}
@@ -381,7 +381,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <div class="drop" id="drop">
         <button type="button" class="primary" id="pick">파일 선택</button>
         <input type="file" id="file" multiple accept=".pdf,.xlsx,.docx" hidden>
-        <span>또는 여기에 끌어다 놓기 · PDF, XLSX, DOCX · 파일당 20MB · 파일 하나에 여러 장이어도 됩니다</span>
+        <span>또는 여기에 끌어다 놓기 · PDF, XLSX, DOCX · 20MB가 넘는 파일은 느릴 수 있음 · 파일 하나에 여러 장이어도 됩니다</span>
       </div>
       <div class="tblwrap"><table class="tbl files" id="files"></table></div>
       <div class="summary" id="local"></div>
@@ -850,15 +850,18 @@ async function readDocx(entry) {
   const r = await mammoth.extractRawText({arrayBuffer: await entry.file.arrayBuffer()});
   entry.text = (r.value || '').trim(); entry.note = `${entry.text.length.toLocaleString()}자`;
 }
+const BIG_FILE = 20 * 1048576;   // larger files still load, with a warning: pdf.js keeps the whole file in browser memory
 async function addFiles(list) {
   for (const f of list) {
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     const entry = {id: ++fileSeq, file: f, kind: ext, status: '대기', pages: null};
     if (!['pdf', 'xlsx', 'docx'].includes(ext)) { entry.status = '지원하지 않는 형식'; entry.bad = true; }
-    else if (f.size > 20 * 1048576) { entry.status = '20MB 초과'; entry.bad = true; }
+    else if (f.size > BIG_FILE) entry.big = true;
     S.files.push(entry);
   }
   renderFiles();
+  const big = list.filter(f => f.size > BIG_FILE).length;
+  if (big) say(`20MB가 넘는 파일 ${big}개를 읽습니다. 브라우저가 한동안 느려질 수 있고, 멈추면 PDF를 장 단위로 나눠 올리세요.`, 'warn');
   const todo = S.files.filter(x => x.status === '대기');
   if (todo.some(e => e.kind === 'pdf')) {
     // open the PDFs first so the progress ring knows how many sheets are coming
@@ -874,8 +877,9 @@ async function addFiles(list) {
     e.status = '읽는 중'; renderFiles();
     try {
       if (e.kind === 'pdf') await readPdf(e); else if (e.kind === 'xlsx') await readXlsx(e); else await readDocx(e);
-      e.status = '완료'; e.ok = true;
-    } catch (err) { e.status = '읽기 실패: ' + (err.message || err); e.bad = true; }
+      e.status = '완료'; e.ok = !e.big; e.warn = e.big;
+      if (e.big) e.note = (e.note ? e.note + ' · ' : '') + '큰 파일';
+    } catch (err) { e.status = '읽기 실패: ' + (err.message || err) + (e.big ? ' (큰 파일 — 장 단위로 나눠 올려 보세요)' : ''); e.bad = true; }
     renderFiles();
   }
   S.links = buildLinks(S.sheets);
@@ -906,7 +910,7 @@ function renderFiles() {
   const T = $('#files');
   if (!S.files.length) { T.innerHTML = ''; return; }
   T.innerHTML = `<thead><tr><th>파일</th><th>형식</th><th>장/시트</th><th>크기</th><th style="text-align:left">상태</th><th></th></tr></thead><tbody>${S.files.map(e =>
-    `<tr><td class="l" style="overflow-wrap:anywhere">${esc(e.file.name)}</td><td class="num">${esc(e.kind.toUpperCase())}</td><td class="num">${e.pages ?? '–'}</td><td class="num">${kb(e.file.size)}</td><td class="st ${e.bad ? 'bad' : e.ok ? 'ok' : ''}">${esc(e.status)}${e.note ? ' · ' + esc(e.note) : ''}</td><td><button type="button" class="link" data-rm="${e.id}" aria-label="${esc(e.file.name)} 빼기">빼기</button></td></tr>`).join('')}</tbody>`;
+    `<tr><td class="l" style="overflow-wrap:anywhere">${esc(e.file.name)}</td><td class="num">${esc(e.kind.toUpperCase())}</td><td class="num">${e.pages ?? '–'}</td><td class="num">${kb(e.file.size)}</td><td class="st ${e.bad ? 'bad' : e.warn ? 'warn' : e.ok ? 'ok' : ''}">${esc(e.status)}${e.note ? ' · ' + esc(e.note) : ''}</td><td><button type="button" class="link" data-rm="${e.id}" aria-label="${esc(e.file.name)} 빼기">빼기</button></td></tr>`).join('')}</tbody>`;
   T.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => removeFile(+b.dataset.rm));
 }
 function renderLocal() {
