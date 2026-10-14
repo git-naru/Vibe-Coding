@@ -521,7 +521,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <span class="lab" id="v-mode-lab">흐름 보기</span>
         <div class="seg" id="v-mode" role="group" aria-labelledby="v-mode-lab"><button type="button" data-m="pkg" aria-pressed="true">패키지별</button><button type="button" data-m="eq" aria-pressed="false">설비별</button></div>
         <span class="muted" id="v-mode-st" aria-live="polite"></span>
-        <button type="button" id="pkg-make" hidden title="설비를 발주·공정 단위 패키지로 묶습니다. Claude 1회">패키지 묶기</button>
+        <button type="button" id="pkg-make" hidden title="공정 구역(Area, Tag 앞 4자리)마다 패키지 하나로 묶습니다">Area별로 묶기</button>
       </div>
       <div class="main">
         <div class="sheet">
@@ -1185,58 +1185,32 @@ async function describeFlow(D, signal) {
   D.desc = {...out, at: Date.now()};
   return D.desc;
 }
-/* Packages: equipment grouped into purchase / unit-operation packages (the unit for investment cost). */
-function packPrompt(D) {
-  const NI = nodeInfoOf(D), ST = D.streams || {}, dn = (D.desc || {}).nodes || {};
-  const eq = (D.nodes || []).filter(isEquipNode).slice(0, 250).map(n => `${n.id} | ${n.title} | ${n.sub && n.sub !== n.id ? n.sub : ''} | ${(dn[n.id] || ((NI[n.id] || {}).info || []).join(' ')).slice(0, 140)}`);
-  const conns = linksOf(D).slice(0, 400).map(l => `${(ST[l.id] || {}).label || l.id} | ${l.from} → ${l.to} | ${(ST[l.id] || {}).ko || ''}`);
-  return `[[PACKAGES]]
-너는 EPC 공정 설계·견적 엔지니어다. 아래 공정 흐름도("${(D.meta || {}).title || ''}")의 설비를 패키지로 묶는다.
-패키지는 투자비 산출 단위로, 함께 발주·공급되거나 한 단위 공정을 이루는 설비 묶음이다.
-예: 반응조 + 교반기 + 공급 펌프, 필터프레스 + 공급 탱크 + 여액 펌프, 보일러 패키지, 증발·결정 패키지, 이온교환 패키지, 건조·포장 패키지.
-
-규칙
-- 목록의 설비 키만 쓰고, 한 설비는 한 패키지에만 넣는다. 가능한 모든 설비를 넣는다.
-- 흐름으로 이어지고 같은 공정 구역(Tag 앞 4자리)에 있는 설비끼리 묶는다. 보통 패키지 하나에 설비 2~8개. 단독으로 큰 설비는 혼자 패키지가 될 수 있다.
-- 패키지 순서는 공정 흐름 순서(원료 → 제품)로 한다.
-- name: 짧은 한국어 패키지 이름(예: "Lime 반응 패키지"). what: 패키지가 하는 일 한 문장.
-
-출력은 JSON 하나만:
-{"packages":[{"name":"Lime 반응 패키지","what":"염수에 소석회를 넣어 Mg를 침전시킨다","members":["3200-RX-005","3200-TK-001"]}]}
-
-## 설비 (키 | 이름 | Tag | 설명)
-${eq.join('\n')}
-
-## 연결 (Stream | From → To | 이름)
-${conns.join('\n')}`;
+/* Packages (the unit for investment cost): one per process area — the 4-digit area of the tags — holding its
+   equipment and its sheets' distribution headers; battery limits and off-page ends stay outside. Named from what the
+   drawings say about the area: the title-block line "3200 - LIME REACTION", else the flow's row title or the area's
+   sheet title, else "3200 Area". */
+function areaLabel(a, D) {
+  const sh = S.sheets.find(x => x.area && x.area.code === a && x.area.name), fr = (D.frames || []).find(f => f.title && f.title.startsWith(a + ' · '));
+  const ms = ((D.meta || {}).sheets || []).find(x => x.dwg && x.title && new RegExp(`(?:^|-)${a}-`).test(x.dwg));
+  const name = (EQ.areaNames || {})[a] || (sh && sh.area.name) || (fr && fr.title.slice(a.length + 3)) || (ms && ms.title) || '';
+  return {name: (name ? `${a} ${name}` : `${a} Area`).slice(0, 60), sheet: ms ? ms.title : ''};
 }
-async function packFlow(D, signal) {
-  calls++;
-  const r = await SAMPLE.json(packPrompt(D), {signal, modelTier: 'default'});
-  const ok = new Set((D.nodes || []).filter(isEquipNode).map(n => n.id)), used = new Set(), out = [];
-  (r && Array.isArray(r.packages) ? r.packages : []).forEach(p => {
-    const ms = (Array.isArray(p.members) ? p.members : []).map(String).filter(m => ok.has(m) && !used.has(m)); if (!ms.length) return;
-    ms.forEach(m => used.add(m));
-    out.push({id: 'P' + (out.length + 1), name: String(p.name || '패키지 ' + (out.length + 1)).slice(0, 60), what: String(p.what || '').slice(0, 300), members: ms});
+function packFlow(D) {
+  const by = new Map();
+  for (const n of D.nodes || []) { if (n.src || /^(OFF|BL):/.test(n.id)) continue; const a = areaOf(n); if (a) by.has(a) ? by.get(a).push(n.id) : by.set(a, [n.id]); }
+  D.packages = [...by].sort((p, q) => p[0].localeCompare(q[0], 'en', {numeric: true})).map(([a, ms], i) => {
+    const L = areaLabel(a, D), eq = ms.filter(m => isEquipNode(D.nodes.find(n => n.id === m))).length;
+    return {id: 'P' + (i + 1), name: L.name, what: `Area ${a}${L.sheet && !L.name.includes(L.sheet) ? ' · ' + L.sheet : ''} · 설비 ${eq}개`, members: ms, area: a};
   });
-  if (!out.length) throw {code: 'invalid_json'};
-  D.packages = out; PKV.delete(D);
-  return out;
+  PKV.delete(D);
+  return D.packages;
 }
 async function packCurrent() {
   if (!S.result || busy()) return;
-  const st = $('#v-mode-st');
-  try {
-    SAMPLE = SAMPLE || (window.claude ? await window.claude.use('sample') : null);
-    if (!SAMPLE) { st.textContent = 'Claude 기능은 claude.ai에서 이 페이지를 열 때만 쓸 수 있습니다.'; return; }
-    DESC_JOB.running = true; DESC_JOB.ctl = new AbortController(); updateViewBar(); updateDescButton();
-    st.textContent = '설비를 패키지로 묶는 중… (Claude)';
-    const D = S.result; await packFlow(D, DESC_JOB.ctl.signal);
-    DESC_JOB.running = false; S.viewMode = 'pkg';
-    if (S.result === D) await showView();
-    if (S.project && S.bundle) await saveRecord();
-  } catch (e) { DESC_JOB.running = false; updateViewBar(); st.textContent = errText(e); }
-  finally { DESC_JOB.running = false; updateDescButton(); $('#pkg-make').disabled = busy(); }
+  const D = S.result, pk = packFlow(D);
+  S.viewMode = 'pkg'; await showView();
+  $('#v-mode-st').textContent = pk.length ? `Area ${pk.length}개로 묶었습니다.` : 'Area(Tag 앞 4자리)를 알 수 있는 설비가 없어 묶지 못했습니다.';
+  if (S.project && S.bundle) await saveRecord();
 }
 const DESC_JOB = {running: false, ctl: null};
 async function describeCurrent() {
@@ -1263,7 +1237,7 @@ async function describeCurrent() {
 const STEP_DEFS = [
   ['read', '파일 읽기', '브라우저'], ['sheets', '시트 식별·시트 간 연결', '브라우저'], ['scope', '계통 범위 판단', 'Claude'],
   ['topo', '시트 안 연결 해석', 'Claude'], ['values', 'Stream 값 채우기', '브라우저·Claude'], ['check', '물질수지·시트 간 비교', '브라우저'],
-  ['draw', '자동 배치·그리기', '브라우저'], ['desc', '설비·라인 설명 작성', 'Claude'], ['pkg', '패키지 묶기', 'Claude']];
+  ['draw', '자동 배치·그리기', '브라우저'], ['desc', '설비·라인 설명 작성', 'Claude'], ['pkg', 'Area별 패키지 묶기', '브라우저']];
 const stepState = {};
 function setStep(k, st, det) {
   stepState[k] = {st, det: det ?? (stepState[k] || {}).det}; renderSteps();
@@ -1379,8 +1353,8 @@ async function generate(mode) {
       try { const d = await describeFlow(D, S.ctl.signal); setStep('desc', 'done', `설비 ${Object.keys(d.nodes).length} · 라인 ${Object.keys(d.streams).length}`); }
       catch (e) { if (e && e.code === 'cancelled') throw e; setStep('desc', 'fail', errText(e) + ' · 결과 화면의 "설명 작성"으로 다시 할 수 있습니다'); }
       setStep('pkg', 'run');
-      try { const pk = await packFlow(D, S.ctl.signal); setStep('pkg', 'done', `패키지 ${pk.length}개 · 설비 ${pk.reduce((a, x) => a + x.members.length, 0)}개`); }
-      catch (e) { if (e && e.code === 'cancelled') throw e; setStep('pkg', 'fail', errText(e) + ' · 결과 화면의 "패키지 묶기"로 다시 할 수 있습니다'); }
+      try { const pk = packFlow(D); setStep('pkg', 'done', `패키지 ${pk.length}개 · 설비 ${pk.reduce((a, x) => a + x.members.length, 0)}개`); }
+      catch (e) { if (e && e.code === 'cancelled') throw e; setStep('pkg', 'fail', errText(e) + ' · 결과 화면의 "Area별로 묶기"로 다시 할 수 있습니다'); }
       tabs.push({key: job.main ? 'main' : 'sys-' + Date.now() + '-' + tabs.length, label: job.main ? 'Main Stream' : (D.meta.title || job.system), main: job.main, flow: D});
     }
     if (add) { S.bundle.tabs.push(...tabs); S.bundle.active = S.bundle.tabs.length - 1; $('#r-sys').value = ''; }
@@ -1506,7 +1480,8 @@ function assemble({system, sc, cats, topo, vals, main, side}) {
    very wide) is laid out one process area per row, rows stacked top to bottom in flow order; links
    between neighbouring rows run in the gap between them, recycles and row-skipping links run in lanes
    down the left margin. */
-const NODE_SIZE = n => n.src ? [170, 46] : [190, 64];
+const NODE_SIZE = n => n.src ? [170, 46] : n.pkg ? [Math.min(330, Math.max(190, 34 + 9 * boxTitle(n).length)), 64] : [190, 64];   // package names ("3200 LIME REACTION") get a wider box
+const boxTitle = n => String(n.title || '').slice(0, n.pkg ? 32 : 24);
 /* Equipment of a flow: drawn boxes that are not battery limits, headers or off-page ends. */
 const isEquipNode = n => !n.src && !/^(HDR|OFF|BL):/.test(n.id);
 function linksOf(D) {   // stream ends as box ids: links may name tags (hand-made flows); without links, read the line end points
@@ -1558,10 +1533,10 @@ function layout(D) {
   for (let pass = 0; pass < 3; pass++) edges.forEach(e => { if (!area[e.from] && area[e.to]) area[e.from] = area[e.to]; if (!area[e.to] && area[e.from]) area[e.to] = area[e.from]; });
   D.nodes.forEach(n => { if (!area[n.id]) area[n.id] = '?'; });
   const areas = [...new Set(Object.values(area))];
-  const rows = areas.length >= 2 && (D.meta.main || gr.width > 1800);
+  const rows = areas.length >= 2 && !D.meta.flat && (D.meta.main || gr.width > 1800);   // the package view is one line: each package is already one area
   D.links = D.edges.map(e => ({id: e.id, from: e.from, to: e.to, ...(e.unc ? {unc: true} : {})}));   // equipment ends of each stream (the equipment list reads them)
   if (!rows) {
-    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: n.title.slice(0, 24), sub: n.sub, src: n.src, pkg: n.pkg}; });
+    D.nodes = D.nodes.map(n => { const p = g.node(n.id), [w, h] = NODE_SIZE(n); return {id: n.id, x: Math.round(p.x - w / 2), y: Math.round(p.y - h / 2), w, h, title: boxTitle(n), sub: n.sub, src: n.src, pkg: n.pkg}; });
     D.lines = edges.map(e => { const ed = g.edge({v: e.from, w: e.to, name: e.key}); return {s: e.id, pts: ed.points.map(p => [Math.round(p.x), Math.round(p.y)]), lab: [Math.round(ed.x), Math.round(ed.y)], dashed: e.unc}; });
     D.meta.viewBox = [Math.ceil(gr.width + 10), Math.ceil(gr.height + 10)];
     delete D.edges; return;
@@ -1627,7 +1602,7 @@ function layout(D) {
   });
   const names = {}; (S.sheets || []).forEach(sh => { if (sh.area && sh.area.code && sh.area.name) names[sh.area.code] = sh.area.name; });
   D.frames = rowBox.map((b, i) => ({x: b.x - 12, y: b.y - 26, w: b.w + 24, h: b.h + 36, title: areas[i] === '?' ? '기타' : `${areas[i]}${names[areas[i]] ? ' · ' + names[areas[i]] : ''}`, ty: b.y - 10}));
-  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: n.title.slice(0, 24), sub: n.sub, src: n.src, pkg: n.pkg}));
+  D.nodes = D.nodes.map(n => ({id: n.id, ...pos[n.id], title: boxTitle(n), sub: n.sub, src: n.src, pkg: n.pkg}));
   D.lines = lines;
   D.meta.viewBox = [Math.ceil(marginL + Math.max(...rowBox.map(b => b.w)) + 40), Math.ceil(y + 30)];
   D.meta.minWidth = Math.max(D.meta.minWidth || 0, 1100);
@@ -1796,7 +1771,7 @@ function updateDescButton() {
   $('#d-desc').textContent = has ? '설명 다시 작성' : '설명 작성';
   $('#d-desc').disabled = S.running || DESC_JOB.running;
 }
-/* Package view: each package (flow.packages, grouped by Claude) is drawn as one box; streams between
+/* Package view: each package (flow.packages, one per area) is drawn as one box in one line; streams between
    packages are the lines, streams inside a package are listed on its card. Derived on the fly, never saved. */
 const PKV = new WeakMap();
 function packageView(D) {
@@ -1827,7 +1802,7 @@ function packageView(D) {
     nodeInfo[n.id] = {...NI0[n.id], links: touching(n.id)};
     if (dn[n.id]) descN[n.id] = dn[n.id];
   });
-  const Dp = {meta: {...D.meta, defaultSelect: null}, categories: D.categories, streams: D.streams, checks: D.checks, balance: D.balance,
+  const Dp = {meta: {...D.meta, defaultSelect: null, flat: true}, categories: D.categories, streams: D.streams, checks: D.checks, balance: D.balance,
     nodeInfo, nodes, edges, desc: {nodes: descN, streams: (D.desc || {}).streams || {}}};
   layout(Dp); Dp.base = D;
   PKV.set(D, Dp); return Dp;
@@ -1845,7 +1820,7 @@ function updateViewBar() {
   $('#v-mode [data-m="pkg"]').disabled = !has;
   const eq = (D.nodes || []).filter(isEquipNode), ids = new Set(eq.map(n => n.id)), packed = has ? new Set(D.packages.flatMap(p => p.members).filter(m => ids.has(m))).size : 0;
   $('#v-mode-st').textContent = !has ? `설비 ${eq.length}개 · 아직 패키지로 묶지 않았습니다` : `패키지 ${D.packages.length}개 · 설비 ${eq.length}개 중 ${packed}개 묶음${eq.length - packed ? ` · 패키지 밖 ${eq.length - packed}개` : ''}`;
-  $('#pkg-make').hidden = !window.claude; $('#pkg-make').textContent = has ? '패키지 다시 묶기' : '패키지 묶기'; $('#pkg-make').disabled = busy();
+  $('#pkg-make').hidden = false; $('#pkg-make').textContent = has ? 'Area별로 다시 묶기' : 'Area별로 묶기'; $('#pkg-make').disabled = busy();
 }
 async function openEquip(id) {   // from a package card: the equipment view, that equipment selected
   S.viewMode = 'eq'; await showView();
@@ -3264,7 +3239,7 @@ function renderEstCard() {
     <td class="num">${fmt(Math.round(w.eq * 100) / 100)}</td><td class="num">${fmt(Math.round(w.pkg * 100) / 100)}</td><td class="num">${fmt(Math.round(w.common * 100) / 100)}</td>
     <td class="num qo" data-q="${esc(normName(w.work))}" style="cursor:text" title="물량 직접 입력 (비우면 학습값)">${fmt(Math.round(w.q * 100) / 100)}${w.qOver ? ' ✎' : ''}</td><td class="num">${w.rate != null ? fmtCost(w.rate) : '<span style="color:var(--warn)">단가 없음</span>'}</td><td class="num">${fmtCost(w.amount)}</td>
     <td class="l"><details><summary class="muted">${w.lines.length}건</summary>${w.lines.slice(0, 40).map(l => `<div class="src">${esc({eq: '설비', pkg: '패키지', common: '공통'}[l.part])} ${fmt(Math.round(l.q * 100) / 100)} · ${esc(l.why)}</div>`).join('')}</details></td></tr>`).join('') || '<tr><td colspan="9" class="muted">학습할 공사물량이 없습니다. 실적 입력의 "공사물량"에 실적 물량을 넣으세요.</td></tr>'}</tbody>`;
-  $('#ec-msg').textContent = C.Q.pkgUnused ? '실적에 패키지 기준 물량이 있지만 이 프로젝트에는 패키지가 없어 적용하지 않았습니다. 흐름도에서 "패키지 묶기"를 하세요.' : '';
+  $('#ec-msg').textContent = C.Q.pkgUnused ? '실적에 패키지 기준 물량이 있지만 이 프로젝트에는 패키지가 없어 적용하지 않았습니다. 흐름도에서 "Area별로 묶기"를 하세요.' : '';
 }
 function editEst(td, kind) {
   if (td.querySelector('input')) return;

@@ -65,7 +65,7 @@ CLAUDE.md                     Claude Code용 작업 규칙 요약
 | 2 | Stream Table 행 → 뷰어 항목 | `parseTextTable`, `parseXlsxTables` |
 | 3 | 파일 읽기 (브라우저) | `readPdf`, `readXlsx`(설비비 목록 자동 인식), `readDocx`, `addFiles`, `finishEquipment` |
 | 4 | Claude에 보낼 도면 조각 렌더 | 타일·크롭 |
-| 5 | Claude 호출 | `ask`, `scopePrompt`, `topoPrompt`, `tablePrompt`, `descPrompt`/`describeFlow`, `packPrompt`/`packFlow` |
+| 5 | Claude 호출 | `ask`, `scopePrompt`, `topoPrompt`, `tablePrompt`, `descPrompt`/`describeFlow`; Area별 패키지 `packFlow`/`areaLabel`(Claude 호출 없음) |
 | 6 | 생성 파이프라인 | `STEP_DEFS`, `buildFlow`, `generate`, `assemble`, `layout`(구역별 줄 배치), `linksOf`, `nodeInfoOf` |
 | 7 | 뷰어 | `renderViewer`(흐름도 + 상세설명 카드), `showBundle`, `packageView`(패키지별 보기), `showView`, 탭 |
 | 8 | 프로젝트·기록 저장 | `store`(db 또는 메모리), `saveRecord`(60,000자 part 분할), `openRecord`, `loadLegacy`, `importJson` |
@@ -86,7 +86,6 @@ claude.ai capabilities: `{"sample": {"images": true}, "db": {}, "user": {}, "dow
 | `[[TOPOLOGY 도면]]` | 시트마다 설비 간 연결 (도면 이미지 + 글자 위치) | 시트당 1 |
 | `[[TABLE 도면]]` | Stream Table이 이미지인 시트의 표 판독 | 해당 시트당 1 |
 | `[[DESCRIBE]]` | 설비·라인 역할 설명 (항목 70개 넘으면 설비/라인 나눠 2회) | 탭당 1~2 |
-| `[[PACKAGES]]` | 설비를 발주·공정 단위 패키지로 묶기 | 탭당 1 |
 | `[[EQUIP-VISION 시트]]` | "그림으로 설비 찾기" (도면 4조각) | 시트당 1, 버튼 |
 | `[[COST-MATCH]]` | 설비비 목록 중 Tag·이름으로 안 맞은 행 짝짓기 | 1, 버튼 |
 
@@ -126,7 +125,7 @@ Playwright로 앱을 실제 브라우저에서 돌리는 테스트를 썼다. �
 | `tabs.js` | 메인 + 계통 탭, 탭 추가, 저장·다시 열기, JSON 왕복 |
 | `eqtest.js`, `vis.js` | Equipment List(진행률·10행·PFD 새 창·Excel), 그림으로 설비 찾기·중지·이어하기 |
 | `layout.js`, `laycls.js` | Layout 카드 위치·Tag 맞춤(약식 Tag·목록에 없는 Tag)·선택·더블클릭 목록 이동·목록 클릭 선택·장 전환·Layout↔PFD 전환; 실제 PFD가 Layout으로 잘못 분류되지 않는지 |
-| `packages.js`, `example.js` | 패키지 생성·보기·설비 이동·다시 묶기, 손으로 그린 흐름도, 예시 프로젝트 가져오기 |
+| `packages.js`, `example.js` | Area별 패키지 생성·보기·설비 이동·다시 묶기, 손으로 그린 흐름도, 예시 프로젝트 가져오기 |
 | `costs.js` | 설비비 목록 인식·Tag/이름/Claude/수동 매칭·직접 입력·Excel 대조 |
 | `estimate.js` | 공사물량·단가·지수 → 산출(같은 PFD면 실적 그대로, 용량 ×2면 ×2^n)·직접 수정·저장 |
 | `noscope.js` | 도면 번호 없는 시트: 파일·쪽으로 찾기, 메인 흐름 대체, 오류 문구 |
