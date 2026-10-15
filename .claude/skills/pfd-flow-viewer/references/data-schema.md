@@ -146,8 +146,9 @@ and shows it at the top of each card in the detail frame:
 ```
 
 Optional `packages` on a flow groups equipment boxes (node ids) into packages, the unit for investment cost. The HTML
-app makes one package per process area (the 4-digit area of the tags, else of the sheet's drawing number) after
-generation (or from "Area별로 묶기"), without Claude: the area's equipment plus its sheets' distribution headers;
+app makes one package per process area (the leading number of the tags: 4 digits in `3200-PU-001`, 3 or 4 in the
+joined form `330T01` / `330-T-01`; else the area of the sheet's drawing number) after generation (or from "패키지
+재설정", which drops the current packages and regroups), without Claude: the area's equipment plus its sheets' distribution headers;
 battery limits and off-page ends stay outside. `name` is the area code plus the area name the drawings give (title
 block "3200 - LIME REACTION", else the flow's row title, else the sheet title), or "3200 Area". The package view is
 drawn from it on the fly: one box per package in one line, only the streams between packages as lines. Records saved
